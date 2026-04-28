@@ -196,6 +196,59 @@ st.markdown(
     width: 100%; letter-spacing: .3px;
     transition: background .15s;
   }
+  /* Hub wrapper – flex container for cards */
+.hub-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  gap: 28px;
+  flex-wrap: wrap;
+  margin: 2.5rem 0;
+}
+/* Hub card style */
+.hub-card {
+  background: #f8faff;
+  border: 2px solid #e0e7ff;
+  border-radius: 18px;
+  padding: 32px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transition: transform 0.18s, box-shadow 0.18s;
+  height: 100%;
+  width: 360px;
+  max-width: 90%;
+  margin: 0 auto;
+}
+.hub-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 40px rgba(67,97,238,.18);
+}
+.hc-icon { font-size: 3rem; margin-bottom: 14px; }
+.hc-title { font-size: 1.25rem; font-weight: 800; color: #1e3a8a; margin-bottom: 8px; }
+.hc-desc { font-size: 0.88rem; color: #475569; line-height: 1.65; margin-bottom: 16px; }
+.hc-tags { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 8px; }
+.hc-tag {
+  background: #e0e7ff;
+  color: #3730a3;
+  border-radius: 20px;
+  padding: 3px 11px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+/* Make columns (if used) same height; but here we use flex container */
+.stButton button {
+  margin-top: auto;
+}
+@media (max-width: 800px) {
+  .hub-card {
+    width: 100%;
+  }
+  .hub-wrapper {
+    gap: 20px;
+  }
+}
   .hub-card .hc-btn:hover { background: #1e3a8a; }
 
   /* animated title */
@@ -386,11 +439,12 @@ if st.session_state["active_tool"] is None:
         unsafe_allow_html=True,
     )
 
-    col_left, col_right = st.columns(2, gap="large")
+    # Use a simple flex wrapper – no Streamlit columns
+    st.markdown('<div class="hub-wrapper">', unsafe_allow_html=True)
 
-    with col_left:
-        st.markdown(
-            """
+    # --- Left card (Statistical Analysis Tool) ---
+    st.markdown(
+        """
 <div class="hub-card">
   <div class="hc-icon">🔬</div>
   <div class="hc-title">Statistical Analysis Tool</div>
@@ -411,15 +465,16 @@ if st.session_state["active_tool"] is None:
   </div>
 </div>
 """,
-            unsafe_allow_html=True,
-        )
-        if st.button("🔬 Open Statistical Analysis Tool", key="goto_stats", type="primary"):
-            st.session_state["active_tool"] = "stats"
-            st.rerun()
+        unsafe_allow_html=True,
+    )
+    # Button (outside the HTML so it works with Streamlit)
+    if st.button("🔬 Open Statistical Analysis Tool", key="goto_stats", type="primary", use_container_width=True):
+        st.session_state["active_tool"] = "stats"
+        st.rerun()
 
-    with col_right:
-        st.markdown(
-            """
+    # --- Right card (Sample Size Calculator) ---
+    st.markdown(
+        """
 <div class="hub-card">
   <div class="hc-icon">📐</div>
   <div class="hc-title">Sample Size Calculator</div>
@@ -441,11 +496,13 @@ if st.session_state["active_tool"] is None:
   </div>
 </div>
 """,
-            unsafe_allow_html=True,
-        )
-        if st.button("📐 Open Sample Size Calculator", key="goto_calc", type="primary"):
-            st.session_state["active_tool"] = "calc"
-            st.rerun()
+        unsafe_allow_html=True,
+    )
+    if st.button("📐 Open Sample Size Calculator", key="goto_calc", type="primary", use_container_width=True):
+        st.session_state["active_tool"] = "calc"
+        st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)   # close hub-wrapper
 
     # Comparison table
     st.markdown("---")
