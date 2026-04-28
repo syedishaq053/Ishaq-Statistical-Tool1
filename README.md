@@ -1,65 +1,72 @@
-# 📊 Ishaq Statistical Analysis Tool
+# IshaKrishnan Statistical Analysis Suite
 
-A comprehensive web-based statistical analysis application built with Streamlit.
+A comprehensive web‑based statistical analysis platform with two
+integrated tools:
 
-## Features
+1.  **Statistical Analysis Tool** -- full parametric & non‑parametric
+    tests, effect sizes, post‑hoc, regression, correlation, and
+    publication‑ready plots.
+2.  **Sample Size Calculator** -- power analysis directly from your data
+    or manually entered parameters (G\*Power‑validated).
 
-- **Multiple statistical tests**: t-tests, Mann-Whitney U, ANOVA, Kruskal-Wallis
-- **Paired and independent comparisons**
-- **Effect size calculations**: Cohen's d, eta-squared, rank-biserial correlation
-- **Post-hoc analyses**: Tukey HSD, Dunn's test with Bonferroni correction
-- **Correlation analysis**: Pearson and Spearman with heatmap visualization
-- **Boxplots with significance annotations**
-- **Bland-Altman plots** for method comparison
-- **Outlier detection** using IQR method
-- **Export results** as CSV and PNG
+**Live demo**: https://www.meddatastats.com\
+*Free for Indian users; 90‑day trial for others.*
 
-## Installation
+------------------------------------------------------------------------
 
-### Local Development
+## 📊 Features
 
-1. Clone this repository:
-   ```bash
-   git clone [github.com](https://github.com/syedishaq053/ishaq-stats-app.git)
-   cd ishaq-stats-app
+### Statistical Analysis Tool
 
-2. Create a virtual environment
+-   Upload Excel/CSV, handle missing data, outlier removal
+-   Parametric & non‑parametric tests
+-   Effect sizes and post‑hoc analysis
+-   Correlation matrices and visualizations
+-   Export results as CSV, PNG, PDF
 
-PowerShell (recommended on Windows):
+### Sample Size Calculator
 
-```powershell
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-```
+-   A priori, post hoc, sensitivity analysis
+-   Multiple statistical test families
+-   Interactive power curves
+-   Downloadable reports
 
-If activation is blocked by PowerShell execution policy:
+------------------------------------------------------------------------
 
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-.\venv\Scripts\Activate.ps1
-```
+## 🛠️ Tech Stack
 
-Command Prompt (cmd.exe):
+-   Streamlit
+-   SciPy, Statsmodels, Scikit-learn
+-   Matplotlib, Seaborn
+-   Supabase (PostgreSQL)
+-   Render + Cloudflare
 
-```cmd
-python -m venv venv
-venv\Scripts\activate
-```
+------------------------------------------------------------------------
 
-Git Bash / WSL (Unix-style):
+## 🚀 Setup
 
-```bash
-python -m venv venv
-source venv/bin/activate
-```
-
-3. Install dependencies
-
-```bash
+``` bash
+git clone https://github.com/your-username/statistical-analysis-suite.git
+cd statistical-analysis-suite
 pip install -r requirements.txt
+streamlit run app.py
 ```
 
-4. Run the application 
+------------------------------------------------------------------------
 
-streamlit run app.py
+## 🔐 Secrets Configuration
+
+Create `.streamlit/secrets.toml`:
+
+``` toml
+SUPABASE_URL = "https://your-project.supabase.co"
+SUPABASE_KEY = "your-anon-key"
+```
+
+------------------------------------------------------------------------
+
+## 📄 License
+
+MIT License
+
 
