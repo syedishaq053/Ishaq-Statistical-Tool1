@@ -1313,19 +1313,27 @@ if df_raw is not None:
 # ─────────────────────────────────────────────────────────
 if phase == 1:
     st.markdown("""
-## Welcome to the Statistical Analysis Tool! 👋
+## Welcome! 👋
+This tool handles **two data layouts** — choose the one that matches your Excel file.
 
-### 📊 Wide Format
+### 📊 Wide Format — *Each group is its own column*
+
 | Day | Cow_A | Cow_B | Cow_C |
 |-----|-------|-------|-------|
-| 1 | 25.3 | 22.8 | 21.5 |
+| 1   | 25.3  | 22.8  | 21.5  |
+| 2   | 26.1  | 23.4  | 22.0  |
 
-→ 2 cols → t-test + Mann-Whitney · ≥3 cols → ANOVA + Kruskal-Wallis
+→ Select Wide format → pick Cow_A + Cow_B → **t-test + Mann-Whitney U**  
+→ Add Cow_C → **ANOVA + Kruskal-Wallis + post-hoc**
 
-### 📋 Long Format
+### 📋 Long Format — *One value column + one group column*
+
 | Milk_Yield | Cow |
 |------------|-----|
-| 25.3 | A |
+| 25.3       | A   |
+| 22.8       | B   |
+
+→ Select Long format → pick Milk_Yield as numeric, Cow as categorical
 
 ### ⚙️ Features
 | Feature | Details |
