@@ -1,4 +1,4 @@
-# IshaKrishnan Statistical Analysis Suite
+# Ishaq Statistical Analysis Suite
 
 A comprehensive web‑based statistical analysis platform with two
 integrated tools:
