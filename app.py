@@ -459,14 +459,13 @@ if st.session_state["active_tool"] == "calc":
         unsafe_allow_html=True,
     )
 
-    # Load the external HTML file; if present render and stop.
     try:
         with open("samplesize.html", "r", encoding="utf-8") as f:
             calc_html = f.read()
         components.html(calc_html, height=1200, scrolling=True)
-        st.stop()
     except FileNotFoundError:
-        st.error("Calculator file 'samplesize.html' not found — rendering embedded fallback.")
+        st.error("Calculator file 'samplesize.html' not found. Please ensure the file exists in the same directory.")
+    st.stop()
 
 
 # ═══════════════════════════════════════════════════════════
