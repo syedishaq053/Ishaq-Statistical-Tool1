@@ -56,6 +56,11 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+components.html("""
+<script>
+window.scrollTo(0, 0);
+</script>
+""", height=0)
 # ═══════════════════════════════════════════════════════════
 # SESSION STATE — initialise all keys once
 # ═══════════════════════════════════════════════════════════
