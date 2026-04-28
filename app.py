@@ -515,7 +515,7 @@ if st.session_state["active_tool"] == "calc":
     try:
         with open("samplesize.html", "r", encoding="utf-8") as f:
             calc_html = f.read()
-        components.html(calc_html, height=1100, scrolling=True)
+        components.html(calc_html, height=1200, scrolling=True)
         st.stop()
     except FileNotFoundError:
         st.error("Calculator file 'samplesize.html' not found — rendering embedded fallback.")
