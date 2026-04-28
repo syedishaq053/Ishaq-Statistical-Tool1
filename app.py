@@ -43,6 +43,9 @@ except ImportError:
     _supabase_available = False
 from datetime import datetime
 
+# ... (previous imports, page config, CSS, GA code)
+
+
 # ═══════════════════════════════════════════════════════════
 # PAGE CONFIG
 # ═══════════════════════════════════════════════════════════
@@ -52,52 +55,6 @@ st.set_page_config(
     page_icon="📊",
     initial_sidebar_state="expanded",
 )
-
-# ─────────────────────────────────────────────────────────────
-# Supabase setup
-supabase_url = ""
-supabase_key = ""
-try:
-    supabase_url = st.secrets.get("SUPABASE_URL", "")
-    supabase_key = st.secrets.get("SUPABASE_KEY", "")
-except Exception:
-    pass
-
-supabase = None
-if _supabase_available and supabase_url and supabase_key:
-    try:
-        supabase = create_client(supabase_url, supabase_key)
-    except Exception:
-        supabase = None
-
-
-def get_country():
-    try:
-        return requests.get("https://ipapi.co/country/", timeout=4).text.strip()
-    except Exception:
-        return "Unknown"
-
-
-if "user_country" not in st.session_state:
-    st.session_state.user_country = get_country()
-
-
-def is_trial_active(email):
-    if supabase is None:
-        return False
-    try:
-        result = (
-            supabase.table("users").select("trial_start").eq("email", email).execute()
-        )
-        if not getattr(result, "data", None):
-            return False
-        trial_start = datetime.fromisoformat(
-            result.data[0]["trial_start"].replace("Z", "+00:00")
-        )
-        return (datetime.now() - trial_start).days < 90
-    except Exception:
-        return False
-
 
 # ═══════════════════════════════════════════════════════════
 # SESSION STATE — initialise all keys once
@@ -319,76 +276,10 @@ components.html(ga_code, height=0)
 # ═══════════════════════════════════════════════════════════
 # ACCESS CONTROL
 # ═══════════════════════════════════════════════════════════
-_country = st.session_state.user_country
-_trial   = st.session_state.get("trial_active", False)
+from access_control import handle_access
 
-if _country != "IN" and not _trial:
-    st.markdown(
-        """
-<div style="max-width:480px;margin:60px auto;padding:32px 36px;
-     background:#f8faff;border:1px solid #c7d2fe;border-radius:14px;
-     box-shadow:0 4px 24px rgba(67,97,238,.10);">
-  <h2 style="text-align:center;color:#3730a3;margin-bottom:4px;">
-    📊 IshaQ‑Krishnan Stats Suite
-  </h2>
-  <p style="text-align:center;color:#666;font-size:0.9rem;margin-bottom:20px;">
-    Comprehensive statistical analysis · Free 90‑day trial for new users
-  </p>
-</div>
-""",
-        unsafe_allow_html=True,
-    )
-
-    st.info("🌍 Enter your email below to start your **free 90‑day trial**.")
-    reg_email = st.text_input(
-        "Email address", placeholder="you@example.com", key="reg_email"
-    )
-
-    if st.button("🚀 Start Free Trial", type="primary"):
-        if not reg_email or "@" not in reg_email:
-            st.warning("Please enter a valid email address.")
-        elif supabase is None:
-            st.success("✅ Trial started (local mode).")
-            st.session_state["trial_active"] = True
-            st.rerun()
-        else:
-            try:
-                existing = (
-                    supabase.table("users")
-                    .select("trial_start,email")
-                    .eq("email", reg_email)
-                    .execute()
-                )
-                if not getattr(existing, "data", None):
-                    supabase.table("users").insert(
-                        {"email": reg_email, "country": _country}
-                    ).execute()
-                    st.success("✅ Trial started! You have 90 days of free access.")
-                    st.session_state["trial_active"] = True
-                    st.rerun()
-                else:
-                    trial_start = datetime.fromisoformat(
-                        existing.data[0]["trial_start"].replace("Z", "+00:00")
-                    )
-                    days_used = (datetime.now().astimezone() - trial_start).days
-                    if days_used < 90:
-                        st.success(
-                            f"✅ Welcome back! You have **{90 - days_used} days** left."
-                        )
-                        st.session_state["trial_active"] = True
-                        st.rerun()
-                    else:
-                        st.error(
-                            "❌ Your 90‑day trial has ended. "
-                            "Please subscribe to continue."
-                        )
-            except Exception as e:
-                st.error(f"Registration failed: {e}")
+if not handle_access():
     st.stop()
-
-elif _country == "IN":
-    st.success("🇮🇳 Free access for India")
-
 # ═══════════════════════════════════════════════════════════
 # ANIMATED TITLE (shared across hub and both tools)
 # ═══════════════════════════════════════════════════════════
