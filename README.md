@@ -9,7 +9,7 @@ integrated tools:
 2.  **Sample Size Calculator** -- power analysis directly from your data
     or manually entered parameters (G\*Power‑validated).
 
-**Live demo**: https://www.meddatastats.com\
+**Live demo**: https://www.meddatastats.com/
 *Free for Indian users; 90‑day trial for others.*
 
 ------------------------------------------------------------------------
