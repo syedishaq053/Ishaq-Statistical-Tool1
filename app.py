@@ -43,8 +43,6 @@ except ImportError:
     _supabase_available = False
 from datetime import datetime
 
-# ... (previous imports, page config, CSS, GA code)
-
 
 # ═══════════════════════════════════════════════════════════
 # PAGE CONFIG
@@ -61,12 +59,13 @@ components.html("""
 window.scrollTo(0, 0);
 </script>
 """, height=0)
+
 # ═══════════════════════════════════════════════════════════
 # SESSION STATE — initialise all keys once
 # ═══════════════════════════════════════════════════════════
 _ss_defaults = {
     # navigation
-    "active_tool": None,          # None → hub, "stats" → stats tool, "calc" → sample size
+    "active_tool": None,
     "trial_active": False,
     # stats tool state
     "df_loaded": None,
@@ -105,6 +104,11 @@ _ss_defaults = {
     "res_wide_mode": False,
     "res_group_cols_wide": [],
     "res_df_clean": None,
+    # extra plots cache
+    "res_xcat_extra": None,
+    "res_xvars_extra": [],
+    "res_yvars_extra": [],
+    "res_group_extra": None,
 }
 for _k, _v in _ss_defaults.items():
     if _k not in st.session_state:
@@ -123,7 +127,6 @@ st.markdown(
   .stTabs [data-baseweb="tab"] { padding:8px 14px; background:#f0f2f6; border-radius:5px; }
   div[data-testid="metric-container"] { background:#f8f9fa; border-radius:8px; padding:8px; }
 
-  /* ── HUB CARDS ─────────────────────────────────────────── */
   .hub-wrapper {
     display: flex; gap: 28px; justify-content: center;
     flex-wrap: wrap; margin: 2.5rem 0;
@@ -158,62 +161,33 @@ st.markdown(
     width: 100%; letter-spacing: .3px;
     transition: background .15s;
   }
-  /* Hub wrapper – flex container for cards */
-.hub-wrapper {
-  display: flex;
-  justify-content: center;
-  align-items: stretch;
-  gap: 28px;
-  flex-wrap: wrap;
-  margin: 2.5rem 0;
-}
-/* Hub card style */
-.hub-card {
-  background: #f8faff;
-  border: 2px solid #e0e7ff;
-  border-radius: 18px;
-  padding: 32px 28px 28px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  transition: transform 0.18s, box-shadow 0.18s;
-  height: 100%;
-  width: 360px;
-  max-width: 90%;
-  margin: 0 auto;
-}
-.hub-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 40px rgba(67,97,238,.18);
-}
-.hc-icon { font-size: 3rem; margin-bottom: 14px; }
-.hc-title { font-size: 1.25rem; font-weight: 800; color: #1e3a8a; margin-bottom: 8px; }
-.hc-desc { font-size: 0.88rem; color: #475569; line-height: 1.65; margin-bottom: 16px; }
-.hc-tags { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 8px; }
-.hc-tag {
-  background: #e0e7ff;
-  color: #3730a3;
-  border-radius: 20px;
-  padding: 3px 11px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-/* Make columns (if used) same height; but here we use flex container */
-.stButton button {
-  margin-top: auto;
-}
-@media (max-width: 800px) {
-  .hub-card {
-    width: 100%;
-  }
   .hub-wrapper {
-    gap: 20px;
+    display: flex; justify-content: center; align-items: stretch;
+    gap: 28px; flex-wrap: wrap; margin: 2.5rem 0;
   }
-}
+  .hub-card {
+    background: #f8faff; border: 2px solid #e0e7ff; border-radius: 18px;
+    padding: 32px 28px 28px; display: flex; flex-direction: column;
+    align-items: center; text-align: center;
+    transition: transform 0.18s, box-shadow 0.18s;
+    height: 100%; width: 360px; max-width: 90%; margin: 0 auto;
+  }
+  .hub-card:hover { transform: translateY(-4px); box-shadow: 0 10px 40px rgba(67,97,238,.18); }
+  .hc-icon { font-size: 3rem; margin-bottom: 14px; }
+  .hc-title { font-size: 1.25rem; font-weight: 800; color: #1e3a8a; margin-bottom: 8px; }
+  .hc-desc { font-size: 0.88rem; color: #475569; line-height: 1.65; margin-bottom: 16px; }
+  .hc-tags { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 8px; }
+  .hc-tag {
+    background: #e0e7ff; color: #3730a3; border-radius: 20px;
+    padding: 3px 11px; font-size: 0.75rem; font-weight: 600;
+  }
+  .stButton button { margin-top: auto; }
+  @media (max-width: 800px) {
+    .hub-card { width: 100%; }
+    .hub-wrapper { gap: 20px; }
+  }
   .hub-card .hc-btn:hover { background: #1e3a8a; }
 
-  /* animated title */
   #anim-title {
     text-align:center; font-size:2rem; font-weight:900;
     font-family:'Segoe UI',sans-serif; letter-spacing:1px;
@@ -225,7 +199,6 @@ st.markdown(
     margin-bottom:0.8rem; letter-spacing:0.4px;
   }
 
-  /* guide / config boxes */
   .guide-box {
     background:#f0f4ff!important; color:#1a1a2e!important;
     border-left:4px solid #4361ee!important; border-radius:8px;
@@ -257,7 +230,6 @@ st.markdown(
   .linkedin-bar a { color:#0a66c2; font-weight:bold; text-decoration:none; }
   .linkedin-bar a:hover { text-decoration:underline; }
 
-  /* back button */
   .back-btn-wrap { margin-bottom: 1rem; }
 </style>
 """,
@@ -285,6 +257,7 @@ from access_control import handle_access
 
 if not handle_access():
     st.stop()
+
 # ═══════════════════════════════════════════════════════════
 # ANIMATED TITLE (shared across hub and both tools)
 # ═══════════════════════════════════════════════════════════
@@ -318,7 +291,7 @@ components.html(
 )
 
 # ═══════════════════════════════════════════════════════════
-# ══════════  HUB — TOOL SELECTOR  ══════════════════════════
+# HUB — TOOL SELECTOR
 # ═══════════════════════════════════════════════════════════
 if st.session_state["active_tool"] is None:
 
@@ -335,10 +308,8 @@ if st.session_state["active_tool"] is None:
         unsafe_allow_html=True,
     )
 
-    # Use a simple flex wrapper – no Streamlit columns
     st.markdown('<div class="hub-wrapper">', unsafe_allow_html=True)
 
-    # --- Left card (Statistical Analysis Tool) ---
     st.markdown(
         """
 <div class="hub-card">
@@ -363,12 +334,10 @@ if st.session_state["active_tool"] is None:
 """,
         unsafe_allow_html=True,
     )
-    # Button (outside the HTML so it works with Streamlit)
     if st.button("🔬 Open Statistical Analysis Tool", key="goto_stats", type="primary", use_container_width=True):
         st.session_state["active_tool"] = "stats"
         st.rerun()
 
-    # --- Right card (Sample Size Calculator) ---
     st.markdown(
         """
 <div class="hub-card">
@@ -398,9 +367,8 @@ if st.session_state["active_tool"] is None:
         st.session_state["active_tool"] = "calc"
         st.rerun()
 
-    st.markdown('</div>', unsafe_allow_html=True)   # close hub-wrapper
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # Comparison table
     st.markdown("---")
     st.markdown(
         """
@@ -445,7 +413,7 @@ if st.session_state["active_tool"] is None:
 
 
 # ═══════════════════════════════════════════════════════════
-# BACK-TO-HUB BUTTON (shown at the top of both tools)
+# BACK-TO-HUB BUTTON
 # ═══════════════════════════════════════════════════════════
 def render_back_button():
     if st.button("← Back to tool selector", key="back_hub"):
@@ -454,7 +422,7 @@ def render_back_button():
 
 
 # ═══════════════════════════════════════════════════════════
-# ══════════  SAMPLE SIZE CALCULATOR TOOL  ══════════════════
+# SAMPLE SIZE CALCULATOR TOOL
 # ═══════════════════════════════════════════════════════════
 if st.session_state["active_tool"] == "calc":
     render_back_button()
@@ -463,7 +431,6 @@ if st.session_state["active_tool"] == "calc":
         "📐 Sample Size Calculator</h2>",
         unsafe_allow_html=True,
     )
-
     try:
         with open("samplesize.html", "r", encoding="utf-8") as f:
             calc_html = f.read()
@@ -474,10 +441,9 @@ if st.session_state["active_tool"] == "calc":
 
 
 # ═══════════════════════════════════════════════════════════
-# ══════════  STATISTICAL ANALYSIS TOOL  ════════════════════
+# STATISTICAL ANALYSIS TOOL
 # ═══════════════════════════════════════════════════════════
 
-# ── Back button in sidebar ───────────────────────────────
 with st.sidebar:
     if st.button("← Tool selector", key="back_to_hub_sb"):
         st.session_state["active_tool"] = None
@@ -487,19 +453,19 @@ with st.sidebar:
 # GUIDE CONTENT
 # ─────────────────────────────────────────────────────────
 GUIDES = {
-    "default": {"title": "👋 Getting Started", "body": "Upload your Excel file or try sample data.<br><br><b>Select any option</b> in the sidebar — this panel will show a contextual guide.<br><br><b>Two layouts:</b><br>• <code>Long</code> — one measurement col + one group col<br>• <code>Wide</code> — each group is its own column"},
-    "nominal": {"title": "🟢 Nominal Data", "body": "<b>Nominal</b> — categories with <em>no order</em>.<br><br>Examples: Blood group, Gender code 0/1, Treatment arm.<br><br>✅ Tests: Chi-square, Mann-Whitney, ANOVA (as grouping factor)."},
-    "ordinal": {"title": "🟡 Ordinal Data", "body": "<b>Ordinal</b> — ranked categories with unequal gaps.<br><br>Examples: Pain 0–3, Likert 1–5, Disease stage I–IV.<br><br>✅ Tests: Mann-Whitney, Kruskal-Wallis, Spearman, Wilcoxon.<br><br>⚠️ Use <b>median &amp; IQR</b>, not mean ± SD."},
-    "wide": {"title": "📊 Wide Format", "body": "Each <b>group</b> is its own column.<br><br><code>Day | Cow_A | Cow_B | Cow_C</code><br><br>Select 2 cols → t-test + Mann-Whitney<br>Select ≥3 cols → ANOVA + Kruskal-Wallis + post-hoc"},
-    "long": {"title": "📋 Long Format", "body": "One <b>measurement</b> col + one <b>group</b> col.<br><br><code>Milk_Yield | Cow</code><br><br>Pick numeric → <code>Milk_Yield</code>, categorical → <code>Cow</code>."},
-    "outliers": {"title": "🧹 Outlier Removal", "body": "IQR method:<br><code>Lower = Q1 − 1.5×IQR</code><br><code>Upper = Q3 + 1.5×IQR</code><br><br>Applied per group. Removed rows shown in <b>Outlier Report</b>."},
-    "paired": {"title": "🔗 Paired Observations", "body": "Tick when each row is a matched pair.<br><br>Examples: Before/After, Left/Right eye, Same cow same day.<br><br>Tests: Paired t-test (normal) or Wilcoxon (non-parametric)."},
-    "chi2": {"title": "🔢 Chi-square Test", "body": "Tests association between two <b>categorical</b> variables.<br><br>Requirements: expected cell count ≥5.<br><br>Output: χ², p-value, df, contingency table + heatmap."},
-    "friedman": {"title": "♻️ Friedman Test", "body": "Non-parametric repeated-measures ANOVA.<br><br>Use for ≥3 matched groups / time points.<br><br>Wide format with ≥3 columns; each row = one subject."},
-    "twoway": {"title": "⚗️ Two-way ANOVA", "body": "Tests two factors + their interaction on a numeric outcome.<br><br>Output: main effect F1, main effect F2, interaction F1×F2."},
-    "mlr": {"title": "📐 Multiple Linear Regression", "body": "Models how multiple predictors explain a numeric outcome.<br><br>Output: R², coefficients, p-values, residual plots."},
-    "impute": {"title": "🔧 Missing Data", "body": "Options:<br>• <b>None</b> — drop rows with any NaN<br>• <b>Mean</b> — good for symmetric data<br>• <b>Median</b> — better for skewed data<br>• <b>Mode</b> — most frequent value"},
-    "scatter": {"title": "🔵 Extra Plot Types", "body": "<b>Scatter:</b> raw points + Pearson r<br><b>Regression:</b> adds 95% CI band<br><b>Bland-Altman:</b> method agreement (needs 2 Y)<br><b>Violin:</b> distribution shape<br><b>Histogram:</b> frequency + KDE<br><b>Bar Chart:</b> mean ± SD<br><b>Paired Lines:</b> before/after per subject"},
+    "default":  {"title": "👋 Getting Started",          "body": "Upload your Excel file or try sample data.<br><br><b>Select any option</b> in the sidebar — this panel will show a contextual guide.<br><br><b>Two layouts:</b><br>• <code>Long</code> — one measurement col + one group col<br>• <code>Wide</code> — each group is its own column"},
+    "nominal":  {"title": "🟢 Nominal Data",              "body": "<b>Nominal</b> — categories with <em>no order</em>.<br><br>Examples: Blood group, Gender code 0/1, Treatment arm.<br><br>✅ Tests: Chi-square, Mann-Whitney, ANOVA (as grouping factor)."},
+    "ordinal":  {"title": "🟡 Ordinal Data",              "body": "<b>Ordinal</b> — ranked categories with unequal gaps.<br><br>Examples: Pain 0–3, Likert 1–5, Disease stage I–IV.<br><br>✅ Tests: Mann-Whitney, Kruskal-Wallis, Spearman, Wilcoxon.<br><br>⚠️ Use <b>median &amp; IQR</b>, not mean ± SD."},
+    "wide":     {"title": "📊 Wide Format",               "body": "Each <b>group</b> is its own column.<br><br><code>Day | Cow_A | Cow_B | Cow_C</code><br><br>Select 2 cols → t-test + Mann-Whitney<br>Select ≥3 cols → ANOVA + Kruskal-Wallis + post-hoc"},
+    "long":     {"title": "📋 Long Format",               "body": "One <b>measurement</b> col + one <b>group</b> col.<br><br><code>Milk_Yield | Cow</code><br><br>Pick numeric → <code>Milk_Yield</code>, categorical → <code>Cow</code>."},
+    "outliers": {"title": "🧹 Outlier Removal",           "body": "IQR method:<br><code>Lower = Q1 − 1.5×IQR</code><br><code>Upper = Q3 + 1.5×IQR</code><br><br>Applied per group. Removed rows shown in <b>Outlier Report</b>."},
+    "paired":   {"title": "🔗 Paired Observations",       "body": "Tick when each row is a matched pair.<br><br>Examples: Before/After, Left/Right eye, Same cow same day.<br><br>Tests: Paired t-test (normal) or Wilcoxon (non-parametric)."},
+    "chi2":     {"title": "🔢 Chi-square Test",           "body": "Tests association between two <b>categorical</b> variables.<br><br>Requirements: expected cell count ≥5.<br><br>Output: χ², p-value, df, contingency table + heatmap."},
+    "friedman": {"title": "♻️ Friedman Test",             "body": "Non-parametric repeated-measures ANOVA.<br><br>Use for ≥3 matched groups / time points.<br><br>Wide format with ≥3 columns; each row = one subject."},
+    "twoway":   {"title": "⚗️ Two-way ANOVA",             "body": "Tests two factors + their interaction on a numeric outcome.<br><br>Output: main effect F1, main effect F2, interaction F1×F2."},
+    "mlr":      {"title": "📐 Multiple Linear Regression","body": "Models how multiple predictors explain a numeric outcome.<br><br>Output: R², coefficients, p-values, residual plots."},
+    "impute":   {"title": "🔧 Missing Data",              "body": "Options:<br>• <b>None</b> — drop rows with any NaN<br>• <b>Mean</b> — good for symmetric data<br>• <b>Median</b> — better for skewed data<br>• <b>Mode</b> — most frequent value"},
+    "scatter":  {"title": "🔵 Extra Plot Types",          "body": "<b>Scatter:</b> raw points + Pearson r<br><b>Regression:</b> adds 95% CI band<br><b>Bland-Altman:</b> method agreement (needs 2 Y)<br><b>Mean Line Graph:</b> mean ± SE per time-point<br><b>Violin:</b> distribution shape<br><b>Histogram:</b> frequency + KDE<br><b>Bar Chart:</b> mean ± SD<br><b>Paired Lines:</b> before/after per subject"},
 }
 
 
@@ -522,17 +488,17 @@ def make_sample_data():
     np.random.seed(42)
     n = 40
     return pd.DataFrame({
-        "Subject": list(range(1, n + 1)),
-        "Group": ["Control"] * 20 + ["Treatment"] * 20,
-        "Sex": np.random.choice(["M", "F"], n),
-        "Timepoint": np.tile(["Pre", "Post"], n // 2),
-        "Age": np.random.randint(25, 65, n),
-        "Score_A": np.concatenate([np.random.normal(50, 10, 20), np.random.normal(62, 10, 20)]),
-        "Score_B": np.concatenate([np.random.normal(48, 12, 20), np.random.normal(60, 11, 20)]),
-        "Score_C": np.concatenate([np.random.normal(52, 9, 20), np.random.normal(58, 13, 20)]),
-        "Biomarker": np.concatenate([np.random.normal(1.2, 0.3, 20), np.random.normal(0.9, 0.2, 20)]),
-        "Pain_Code": np.random.choice([0, 1, 2, 3], n),
-        "Gender_Code": np.random.choice([0, 1], n),
+        "Subject":    list(range(1, n + 1)),
+        "Group":      ["Control"] * 20 + ["Treatment"] * 20,
+        "Sex":        np.random.choice(["M", "F"], n),
+        "Timepoint":  np.tile(["Pre", "Post"], n // 2),
+        "Age":        np.random.randint(25, 65, n),
+        "Score_A":    np.concatenate([np.random.normal(50, 10, 20), np.random.normal(62, 10, 20)]),
+        "Score_B":    np.concatenate([np.random.normal(48, 12, 20), np.random.normal(60, 11, 20)]),
+        "Score_C":    np.concatenate([np.random.normal(52,  9, 20), np.random.normal(58, 13, 20)]),
+        "Biomarker":  np.concatenate([np.random.normal(1.2, 0.3, 20), np.random.normal(0.9, 0.2, 20)]),
+        "Pain_Code":  np.random.choice([0, 1, 2, 3], n),
+        "Gender_Code":np.random.choice([0, 1], n),
         "Pain_Label": np.random.choice(["None", "Mild", "Moderate", "Severe"], n),
     })
 
@@ -549,32 +515,38 @@ def cohens_d_paired(diff):
     sd = np.std(diff, ddof=1)
     return np.mean(diff) / sd if sd else np.nan
 
-def mw_r(u, n1, n2): return 1 - (2*u) / (n1*n2)
+def mw_r(u, n1, n2):
+    return 1 - (2*u) / (n1*n2)
 
 def wil_r(stat, n):
-    exp = n*(n+1)/4
+    exp   = n*(n+1)/4
     std_w = np.sqrt(n*(n+1)*(2*n+1)/24)
     return abs((stat-exp)/std_w) / np.sqrt(n) if std_w else np.nan
 
-def eta_sq(f, dfb, dfw): return (f*dfb) / (f*dfb + dfw)
-def eps_sq(h, n): return h / (n-1)
+def eta_sq(f, dfb, dfw):
+    return (f*dfb) / (f*dfb + dfw)
+
+def eps_sq(h, n):
+    return h / (n-1)
 
 def star(p):
     if pd.isna(p): return "ns"
-    if p < 0.001: return "***"
-    if p < 0.01:  return "**"
-    if p < 0.05:  return "*"
+    if p < 0.001:  return "***"
+    if p < 0.01:   return "**"
+    if p < 0.05:   return "*"
     return "ns"
 
 def add_row(rows, cmp, zone, gs, test, p, eff, etype, nt=""):
-    try: pv = round(float(p), 4) if not np.isnan(float(p)) else np.nan
+    try:    pv = round(float(p),   4) if not np.isnan(float(p))   else np.nan
     except: pv = np.nan
-    try: ev = round(float(eff), 4) if not np.isnan(float(eff)) else np.nan
+    try:    ev = round(float(eff), 4) if not np.isnan(float(eff)) else np.nan
     except: ev = np.nan
-    rows.append({"Comparison": cmp, "Variable/Zone": zone,
+    rows.append({
+        "Comparison": cmp, "Variable/Zone": zone,
         "Group Stats (mean±SD)": gs, "Test": test,
         "P-value": pv, "Significance": star(pv),
-        "Effect Size": ev, "Effect Type": etype, "Normality": nt})
+        "Effect Size": ev, "Effect Type": etype, "Normality": nt,
+    })
 
 def grp_stat_str(sd):
     parts = []
@@ -603,7 +575,7 @@ def all_normal(sl):
 
 def iqr_mask(s):
     Q1, Q3 = s.quantile(0.25), s.quantile(0.75)
-    IQR = Q3 - Q1
+    IQR    = Q3 - Q1
     return (s < Q1 - 1.5*IQR) | (s > Q3 + 1.5*IQR)
 
 def save_fig(fig):
@@ -621,18 +593,20 @@ def smart_grid(n):
 
 def dunn_bonf(gd):
     names = list(gd.keys())
-    res = []
+    res   = []
     for a, b in itertools.combinations(names, 2):
         g1, g2 = gd[a], gd[b]
-        if len(g1) < 2 or len(g2) < 2: continue
+        if len(g1) < 2 or len(g2) < 2:
+            continue
         u = mannwhitneyu(g1, g2, alternative="two-sided")
-        res.append({"Group1": a, "Group2": b, "P_raw": u.pvalue,
+        res.append({"Group1": a, "Group2": b,
+                    "P_raw": u.pvalue,
                     "Effect_Size": mw_r(u.statistic, len(g1), len(g2))})
     if res:
         nt = len(res)
         for r in res:
-            r["P_Bonferroni"] = min(r["P_raw"] * nt, 1.0)
-            r["Significance"] = star(r["P_Bonferroni"])
+            r["P_Bonferroni"]  = min(r["P_raw"] * nt, 1.0)
+            r["Significance"]  = star(r["P_Bonferroni"])
     return pd.DataFrame(res)
 
 
@@ -655,7 +629,7 @@ with st.sidebar:
                     df_raw = pd.read_excel(uploaded_file)
                 if not isinstance(st.session_state["df_loaded"], pd.DataFrame) or \
                    not df_raw.equals(st.session_state["df_loaded"]):
-                    st.session_state["df_loaded"] = df_raw
+                    st.session_state["df_loaded"]    = df_raw
                     st.session_state["analysis_done"] = False
                 st.success(f"✅ {df_raw.shape[0]}r × {df_raw.shape[1]}c")
             except Exception as e:
@@ -688,7 +662,7 @@ with st.sidebar:
         st.session_state["override_ordinal"] = override_ordinal
 
         _all_override = override_nominal + override_ordinal
-        num_cols = [c for c in _num0 if c not in _all_override]
+        num_cols  = [c for c in _num0 if c not in _all_override]
         cat_cols  = _cat0 + _all_override
         col_subtype = {c: "Nominal" for c in override_nominal}
         col_subtype.update({c: "Ordinal" for c in override_ordinal})
@@ -705,7 +679,8 @@ with st.sidebar:
              "📊 Wide format  (each group = its own column)"],
             on_change=set_guide, args=("long",))
         wide_mode = mode.startswith("📊")
-        if wide_mode: set_guide("wide")
+        if wide_mode:
+            set_guide("wide")
 
         st.header("⑤ Variables")
         if wide_mode:
@@ -725,42 +700,109 @@ with st.sidebar:
         if do_paired and not wide_mode:
             subject_id  = st.selectbox("Subject ID column", ["None"] + list(df_raw.columns))
             pairing_col = st.selectbox("Pairing column", ["None"] + cat_cols)
-            subject_id  = None if subject_id == "None" else subject_id
+            subject_id  = None if subject_id  == "None" else subject_id
             pairing_col = None if pairing_col == "None" else pairing_col
 
         do_corr   = st.checkbox("Correlation matrix & heatmap", value=True)
         use_facet = st.checkbox("Faceted boxplots", value=True)
 
+        # ── ⑦ Advanced Tests ─────────────────────────────────────────────
         st.header("⑦ Advanced Tests")
-        do_chi2     = st.checkbox("Chi-square", value=False, on_change=set_guide, args=("chi2",))
-        do_friedman = st.checkbox("Friedman test", value=False, on_change=set_guide, args=("friedman",))
-        do_twoway   = st.checkbox("Two-way ANOVA", value=False, on_change=set_guide, args=("twoway",))
-        do_mlr      = st.checkbox("Multiple linear regression", value=False, on_change=set_guide, args=("mlr",))
+        do_chi2     = st.checkbox("Chi-square",                  value=False, on_change=set_guide, args=("chi2",))
+        do_friedman = st.checkbox("Friedman test",               value=False, on_change=set_guide, args=("friedman",))
+        do_twoway   = st.checkbox("Two-way ANOVA",               value=False, on_change=set_guide, args=("twoway",))
+        do_mlr      = st.checkbox("Multiple linear regression",  value=False, on_change=set_guide, args=("mlr",))
 
         chi2_vars = twoway_cat1 = twoway_cat2 = twoway_vars = mlr_outcome = mlr_predictors = None
-        if do_chi2 and len(cat_cols) >= 2:
-            chi2_vars = st.multiselect("Chi-square: 2 categorical cols", cat_cols, max_selections=2)
-        if do_twoway and not wide_mode:
-            twoway_vars = st.multiselect("Two-way ANOVA: numeric outcome(s)", num_cols)
-            twoway_cat1 = st.selectbox("Factor 1", ["None"] + cat_cols)
-            twoway_cat2 = st.selectbox("Factor 2", ["None"] + cat_cols)
-            twoway_cat1 = None if twoway_cat1 == "None" else twoway_cat1
-            twoway_cat2 = None if twoway_cat2 == "None" else twoway_cat2
+
+        # Chi-square
+        if do_chi2:
+            if len(cat_cols) >= 2:
+                chi2_vars = st.multiselect(
+                    "Chi-square: select exactly 2 categorical cols",
+                    cat_cols, max_selections=2)
+            else:
+                st.warning("⚠️ Need ≥2 categorical columns for Chi-square.")
+
+        # Friedman
+        if do_friedman:
+            if wide_mode and len(group_cols_wide) >= 3:
+                st.info(f"Friedman will use all {len(group_cols_wide)} wide-format columns.")
+            elif wide_mode:
+                st.warning("⚠️ Select ≥3 wide-format columns above for Friedman.")
+            else:
+                st.warning("⚠️ Switch to Wide format and select ≥3 columns for Friedman.")
+
+        # Two-way ANOVA
+        if do_twoway:
+            if wide_mode:
+                st.warning("⚠️ Two-way ANOVA requires Long format.")
+            else:
+                twoway_vars = st.multiselect("Two-way ANOVA: numeric outcome(s)", num_cols)
+                twoway_cat1 = st.selectbox("Factor 1 (categorical)", ["None"] + cat_cols, key="twoway_f1")
+                twoway_cat2 = st.selectbox("Factor 2 (categorical)", ["None"] + cat_cols, key="twoway_f2")
+                twoway_cat1 = None if twoway_cat1 == "None" else twoway_cat1
+                twoway_cat2 = None if twoway_cat2 == "None" else twoway_cat2
+
+        # MLR
         if do_mlr:
             mlr_outcome    = st.selectbox("MLR outcome (Y)", ["None"] + num_cols)
             mlr_predictors = st.multiselect("MLR predictors (X)", num_cols)
             mlr_outcome    = None if mlr_outcome == "None" else mlr_outcome
 
+        # ── ⑧ Extra Plots ────────────────────────────────────────────────
         st.header("⑧ Extra Plots")
-        PLOT_TYPES = ["Scatter Plot", "Regression Plot", "Bland-Altman",
-                      "Mean Line Graph", "Violin Plot", "Histogram",
-                      "Bar Chart (Mean±SD)", "Paired Lines Plot"]
-        selected_plots = st.multiselect("Plot types", PLOT_TYPES, default=[],
-                                        on_change=set_guide, args=("scatter",))
-        xvars_extra = st.multiselect("X variable(s)", num_cols)
-        yvars_extra = st.multiselect("Y variable(s)", num_cols)
-        group_extra = st.selectbox("Grouping (optional)", ["None"] + cat_cols)
+
+        PLOT_TYPES = [
+            "Scatter Plot",
+            "Regression Plot",
+            "Bland-Altman",
+            "Mean Line Graph",
+            "Violin Plot",
+            "Histogram",
+            "Bar Chart (Mean±SD)",
+            "Paired Lines Plot",
+        ]
+        selected_plots = st.multiselect(
+            "Plot types", PLOT_TYPES, default=[],
+            on_change=set_guide, args=("scatter",))
+
+        needs_num_x = any(p in selected_plots for p in ["Scatter Plot", "Regression Plot"])
+        needs_cat_x = "Mean Line Graph" in selected_plots
+
+        xvars_extra = []
+        xcat_extra  = None
+
+        if needs_num_x:
+            xvars_extra = st.multiselect(
+                "X variable(s) — numeric  [Scatter / Regression]",
+                num_cols, key="xvars_num")
+
+        if needs_cat_x:
+            xcat_extra = st.selectbox(
+                "X variable — categorical  [Mean Line Graph]\n"
+                "(e.g. Timepoint with levels Pre / Post)",
+                ["None"] + cat_cols, key="xcat_extra")
+            xcat_extra = None if xcat_extra == "None" else xcat_extra
+
+        yvars_extra = st.multiselect(
+            "Y variable(s) — numeric", num_cols, key="yvars_extra")
+
+        group_extra = st.selectbox(
+            "Colour / grouping variable (optional)", ["None"] + cat_cols, key="group_extra")
         group_extra = None if group_extra == "None" else group_extra
+
+        # Contextual tips
+        if "Bland-Altman"     in selected_plots and len(yvars_extra) != 2:
+            st.info("ℹ️ Bland-Altman needs exactly 2 Y variables.")
+        if "Paired Lines Plot" in selected_plots and len(yvars_extra) != 2:
+            st.info("ℹ️ Paired Lines needs exactly 2 Y variables.")
+        if needs_cat_x and not xcat_extra:
+            st.info("ℹ️ Select a categorical X variable for Mean Line Graph.")
+        if needs_cat_x and not yvars_extra:
+            st.info("ℹ️ Select ≥1 Y variable for Mean Line Graph.")
+        if needs_num_x and not xvars_extra:
+            st.info("ℹ️ Select ≥1 numeric X variable for Scatter / Regression.")
 
         c1b, c2b = st.columns(2)
         with c1b:
@@ -771,7 +813,10 @@ with st.sidebar:
         with c2b:
             run_btn = st.button("🚀 Run Analysis", type="primary", use_container_width=True)
 
-        st.markdown("""<div class="linkedin-bar">✉️ <a href="https://www.linkedin.com/in/syed-ishaq-893052285/" target="_blank">🔗 Syed Ishaq on LinkedIn</a></div>""", unsafe_allow_html=True)
+        st.markdown(
+            """<div class="linkedin-bar">✉️ <a href="https://www.linkedin.com/in/syed-ishaq-893052285/"
+            target="_blank">🔗 Syed Ishaq on LinkedIn</a></div>""",
+            unsafe_allow_html=True)
 
     else:
         run_btn = False
@@ -798,7 +843,7 @@ This tool handles **two data layouts** — choose the one that matches your Exce
 | 1   | 25.3  | 22.8  | 21.5  |
 | 2   | 26.1  | 23.4  | 22.0  |
 
-→ Select Wide format → pick Cow_A + Cow_B → **t-test + Mann-Whitney U**  
+→ Select Wide format → pick Cow_A + Cow_B → **t-test + Mann-Whitney U**
 → Add Cow_C → **ANOVA + Kruskal-Wallis + post-hoc**
 
 ### 📋 Long Format — *One value column + one group column*
@@ -852,7 +897,8 @@ if run_btn:
 
     df = df_raw.copy()
     for c in override_nominal + override_ordinal:
-        if c in df.columns: df[c] = df[c].astype(str)
+        if c in df.columns:
+            df[c] = df[c].astype(str)
     for c in num_cols:
         df[c] = pd.to_numeric(df[c], errors="coerce")
     for c in cat_cols:
@@ -873,167 +919,229 @@ if run_btn:
                 for grp in selected_cat:
                     for g in df[grp].dropna().unique():
                         sub = df[df[grp] == g][col].dropna()
-                        if len(sub) >= 4: outlier_rows.update(sub[iqr_mask(sub)].index.tolist())
+                        if len(sub) >= 4:
+                            outlier_rows.update(sub[iqr_mask(sub)].index.tolist())
             else:
                 sub = df[col].dropna()
-                if len(sub) >= 4: outlier_rows.update(sub[iqr_mask(sub)].index.tolist())
+                if len(sub) >= 4:
+                    outlier_rows.update(sub[iqr_mask(sub)].index.tolist())
         if outlier_rows:
-            keep = list(set(group_cols_wide + selected_numeric + selected_cat + ([subject_id] if subject_id else [])))
-            keep = [c for c in keep if c in df.columns]
+            keep = list(set(
+                group_cols_wide + selected_numeric + selected_cat +
+                ([subject_id] if subject_id else [])))
+            keep       = [c for c in keep if c in df.columns]
             outlier_df = df.loc[list(outlier_rows), keep].copy()
-            df = df.drop(index=outlier_rows).reset_index(drop=True)
+            df         = df.drop(index=outlier_rows).reset_index(drop=True)
 
     progress.progress(15, "Running statistical tests…")
     unified_rows = []; posthoc_rows = []
 
+    # ── Wide mode tests ───────────────────────────────────────────────────
     if wide_mode:
-        n_g = len(group_cols_wide)
+        n_g   = len(group_cols_wide)
         gdata = {c: df[c].dropna().values for c in group_cols_wide}
-        sdict = {c: df[c].dropna() for c in group_cols_wide}
-        gs = grp_stat_str(sdict); nt = norm_str(sdict)
+        sdict = {c: df[c].dropna()        for c in group_cols_wide}
+        gs    = grp_stat_str(sdict)
+        nt    = norm_str(sdict)
         label = " vs ".join(group_cols_wide)
+
         if n_g == 2:
-            c1, c2 = group_cols_wide; g1, g2 = gdata[c1], gdata[c2]
+            wc1, wc2 = group_cols_wide
+            wg1, wg2 = gdata[wc1], gdata[wc2]
             if do_paired:
-                paired = df[[c1, c2]].dropna(); diff = paired[c1] - paired[c2]
-                t, tp = ttest_rel(paired[c1], paired[c2])
-                add_row(unified_rows, label, "Paired", gs, "Paired t-test", tp, cohens_d_paired(diff.values), "Cohen's d (paired)", nt)
+                paired = df[[wc1, wc2]].dropna()
+                diff   = paired[wc1] - paired[wc2]
+                t, tp  = ttest_rel(paired[wc1], paired[wc2])
+                add_row(unified_rows, label, "Paired", gs, "Paired t-test",
+                        tp, cohens_d_paired(diff.values), "Cohen's d (paired)", nt)
                 try:
                     w = wilcoxon(diff.values)
-                    add_row(unified_rows, label, "Paired", gs, "Wilcoxon signed-rank", w.pvalue, wil_r(w.statistic, len(diff)), "Rank-biserial r", nt)
-                except: pass
+                    add_row(unified_rows, label, "Paired", gs, "Wilcoxon signed-rank",
+                            w.pvalue, wil_r(w.statistic, len(diff)), "Rank-biserial r", nt)
+                except Exception:
+                    pass
             else:
-                t, tp = ttest_ind(g1, g2)
-                add_row(unified_rows, label, "Column comparison", gs, "Independent t-test", tp, cohens_d_ind(g1, g2), "Cohen's d", nt)
-                u = mannwhitneyu(g1, g2, alternative="two-sided")
-                add_row(unified_rows, label, "Column comparison", gs, "Mann-Whitney U", u.pvalue, mw_r(u.statistic, len(g1), len(g2)), "Rank-biserial r", nt)
+                t, tp = ttest_ind(wg1, wg2)
+                add_row(unified_rows, label, "Column comparison", gs, "Independent t-test",
+                        tp, cohens_d_ind(wg1, wg2), "Cohen's d", nt)
+                u = mannwhitneyu(wg1, wg2, alternative="two-sided")
+                add_row(unified_rows, label, "Column comparison", gs, "Mann-Whitney U",
+                        u.pvalue, mw_r(u.statistic, len(wg1), len(wg2)), "Rank-biserial r", nt)
         else:
-            arrs = list(gdata.values()); n_tot = sum(len(a) for a in arrs)
+            arrs  = list(gdata.values())
+            n_tot = sum(len(a) for a in arrs)
             f, fp = f_oneway(*arrs)
-            add_row(unified_rows, label, "Column comparison", gs, "One-way ANOVA", fp, eta_sq(f, n_g-1, n_tot-n_g), "Eta-squared", nt)
+            add_row(unified_rows, label, "Column comparison", gs, "One-way ANOVA",
+                    fp, eta_sq(f, n_g-1, n_tot-n_g), "Eta-squared", nt)
             if fp < 0.05:
-                sv = np.concatenate(arrs)
-                sg = np.concatenate([[c]*len(gdata[c]) for c in group_cols_wide])
+                sv    = np.concatenate(arrs)
+                sg    = np.concatenate([[c]*len(gdata[c]) for c in group_cols_wide])
                 tukey = pairwise_tukeyhsd(sv, sg, alpha=0.05)
-                td = pd.DataFrame(tukey.summary().data[1:], columns=tukey.summary().data[0])
+                td    = pd.DataFrame(tukey.summary().data[1:], columns=tukey.summary().data[0])
                 for _, row in td.iterrows():
-                    posthoc_rows.append({"Grouping": "Wide", "Variable": "Columns",
+                    posthoc_rows.append({
+                        "Grouping": "Wide", "Variable": "Columns",
                         "Comparison": f"{row['group1']} vs {row['group2']}",
                         "Test": "Tukey HSD", "P_adj": round(float(row["p-adj"]), 4),
                         "Significance": star(row["p-adj"]),
                         "Mean_Diff": round(float(row["meandiff"]), 4),
-                        "Lower_CI": round(float(row["lower"]), 4),
-                        "Upper_CI": round(float(row["upper"]), 4)})
+                        "Lower_CI":  round(float(row["lower"]),   4),
+                        "Upper_CI":  round(float(row["upper"]),   4),
+                    })
             h, hp = kruskal(*arrs)
-            add_row(unified_rows, label, "Column comparison", gs, "Kruskal-Wallis", hp, eps_sq(h, n_tot), "Epsilon-squared", nt)
+            add_row(unified_rows, label, "Column comparison", gs, "Kruskal-Wallis",
+                    hp, eps_sq(h, n_tot), "Epsilon-squared", nt)
             if hp < 0.05:
                 dunn = dunn_bonf(gdata)
                 if not dunn.empty:
                     for _, row in dunn.iterrows():
-                        posthoc_rows.append({"Grouping": "Wide", "Variable": "Columns",
+                        posthoc_rows.append({
+                            "Grouping": "Wide", "Variable": "Columns",
                             "Comparison": f"{row['Group1']} vs {row['Group2']}",
                             "Test": "Dunn (Bonferroni)",
                             "P_adj": round(float(row["P_Bonferroni"]), 4),
                             "Significance": star(row["P_Bonferroni"]),
                             "Effect_Size": round(float(row["Effect_Size"]), 4),
-                            "Effect_Type": "Rank-biserial r"})
+                            "Effect_Type": "Rank-biserial r",
+                        })
+
+    # ── Long mode tests ───────────────────────────────────────────────────
     else:
         if selected_numeric and not selected_cat:
             for v1, v2 in itertools.combinations(selected_numeric, 2):
-                pdf = df[[v1, v2]].dropna(); g1, g2 = pdf[v1].values, pdf[v2].values
-                gs = grp_stat_str({v1: pdf[v1], v2: pdf[v2]}); nt = norm_str({v1: pdf[v1], v2: pdf[v2]})
-                lbl = f"{v1} vs {v2}"
+                pdf    = df[[v1, v2]].dropna()
+                lg1, lg2 = pdf[v1].values, pdf[v2].values
+                gs     = grp_stat_str({v1: pdf[v1], v2: pdf[v2]})
+                nt     = norm_str({v1: pdf[v1], v2: pdf[v2]})
+                lbl    = f"{v1} vs {v2}"
                 if do_paired:
-                    diff = g1-g2; t, tp = ttest_rel(g1, g2)
-                    add_row(unified_rows, lbl, "Numeric comparison", gs, "Paired t-test", tp, cohens_d_paired(diff), "Cohen's d (paired)", nt)
+                    diff  = lg1 - lg2
+                    t, tp = ttest_rel(lg1, lg2)
+                    add_row(unified_rows, lbl, "Numeric comparison", gs, "Paired t-test",
+                            tp, cohens_d_paired(diff), "Cohen's d (paired)", nt)
                     try:
                         w = wilcoxon(diff)
-                        add_row(unified_rows, lbl, "Numeric comparison", gs, "Wilcoxon signed-rank", w.pvalue, wil_r(w.statistic, len(diff)), "Rank-biserial r", nt)
-                    except: pass
+                        add_row(unified_rows, lbl, "Numeric comparison", gs, "Wilcoxon signed-rank",
+                                w.pvalue, wil_r(w.statistic, len(diff)), "Rank-biserial r", nt)
+                    except Exception:
+                        pass
                 else:
-                    t, tp = ttest_ind(g1, g2)
-                    add_row(unified_rows, lbl, "Numeric comparison", gs, "Independent t-test", tp, cohens_d_ind(g1, g2), "Cohen's d", nt)
-                    u = mannwhitneyu(g1, g2, alternative="two-sided")
-                    add_row(unified_rows, lbl, "Numeric comparison", gs, "Mann-Whitney U", u.pvalue, mw_r(u.statistic, len(g1), len(g2)), "Rank-biserial r", nt)
+                    t, tp = ttest_ind(lg1, lg2)
+                    add_row(unified_rows, lbl, "Numeric comparison", gs, "Independent t-test",
+                            tp, cohens_d_ind(lg1, lg2), "Cohen's d", nt)
+                    u = mannwhitneyu(lg1, lg2, alternative="two-sided")
+                    add_row(unified_rows, lbl, "Numeric comparison", gs, "Mann-Whitney U",
+                            u.pvalue, mw_r(u.statistic, len(lg1), len(lg2)), "Rank-biserial r", nt)
 
         for grp in selected_cat:
-            levels = df[grp].dropna().unique(); n_lev = len(levels)
-            if n_lev < 2: continue
+            levels   = df[grp].dropna().unique()
+            n_lev    = len(levels)
+            if n_lev < 2:
+                continue
             is_paired = do_paired and pairing_col and grp == pairing_col and subject_id
+
             for var in selected_numeric:
-                sd_g = {g: df[df[grp]==g][var].dropna() for g in levels}
-                gs = grp_stat_str(sd_g); nt = norm_str(sd_g)
+                sd_g = {g: df[df[grp] == g][var].dropna() for g in levels}
+                gs   = grp_stat_str(sd_g)
+                nt   = norm_str(sd_g)
+
                 if is_paired:
                     wp = df.pivot(index=subject_id, columns=grp, values=var).dropna()
                     if wp.shape[1] == 2:
-                        c1, c2 = wp.columns[0], wp.columns[1]; diff = wp[c1] - wp[c2]
-                        t, tp = ttest_rel(wp[c1], wp[c2])
-                        add_row(unified_rows, f"{grp}(paired)", var, gs, "Paired t-test", tp, cohens_d_paired(diff.values), "Cohen's d (paired)", nt)
+                        pc1, pc2 = wp.columns[0], wp.columns[1]
+                        diff     = wp[pc1] - wp[pc2]
+                        t, tp    = ttest_rel(wp[pc1], wp[pc2])
+                        add_row(unified_rows, f"{grp}(paired)", var, gs, "Paired t-test",
+                                tp, cohens_d_paired(diff.values), "Cohen's d (paired)", nt)
                         try:
                             w = wilcoxon(diff.values)
-                            add_row(unified_rows, f"{grp}(paired)", var, gs, "Wilcoxon signed-rank", w.pvalue, wil_r(w.statistic, len(diff)), "Rank-biserial r", nt)
-                        except: pass
+                            add_row(unified_rows, f"{grp}(paired)", var, gs, "Wilcoxon signed-rank",
+                                    w.pvalue, wil_r(w.statistic, len(diff)), "Rank-biserial r", nt)
+                        except Exception:
+                            pass
+
                 elif n_lev == 2:
-                    g1 = df[df[grp]==levels[0]][var].dropna().values
-                    g2 = df[df[grp]==levels[1]][var].dropna().values
-                    if len(g1) >= 2 and len(g2) >= 2:
-                        lbl = f"{grp} ({levels[0]} vs {levels[1]})"
-                        t, tp = ttest_ind(g1, g2)
-                        add_row(unified_rows, lbl, var, gs, "Independent t-test", tp, cohens_d_ind(g1, g2), "Cohen's d", nt)
-                        u = mannwhitneyu(g1, g2, alternative="two-sided")
-                        add_row(unified_rows, lbl, var, gs, "Mann-Whitney U", u.pvalue, mw_r(u.statistic, len(g1), len(g2)), "Rank-biserial r", nt)
+                    lg1 = df[df[grp] == levels[0]][var].dropna().values
+                    lg2 = df[df[grp] == levels[1]][var].dropna().values
+                    if len(lg1) >= 2 and len(lg2) >= 2:
+                        lbl   = f"{grp} ({levels[0]} vs {levels[1]})"
+                        t, tp = ttest_ind(lg1, lg2)
+                        add_row(unified_rows, lbl, var, gs, "Independent t-test",
+                                tp, cohens_d_ind(lg1, lg2), "Cohen's d", nt)
+                        u = mannwhitneyu(lg1, lg2, alternative="two-sided")
+                        add_row(unified_rows, lbl, var, gs, "Mann-Whitney U",
+                                u.pvalue, mw_r(u.statistic, len(lg1), len(lg2)), "Rank-biserial r", nt)
                 else:
-                    sub = df.dropna(subset=[var, grp])
-                    arrs = [sub[sub[grp]==g][var].dropna().values for g in levels]
-                    if not all(len(a) >= 2 for a in arrs): continue
-                    n_tot = len(sub); f, fp = f_oneway(*arrs)
-                    add_row(unified_rows, grp, var, gs, "One-way ANOVA", fp, eta_sq(f, n_lev-1, n_tot-n_lev), "Eta-squared", nt)
+                    sub  = df.dropna(subset=[var, grp])
+                    arrs = [sub[sub[grp] == g][var].dropna().values for g in levels]
+                    if not all(len(a) >= 2 for a in arrs):
+                        continue
+                    n_tot = len(sub)
+                    f, fp = f_oneway(*arrs)
+                    add_row(unified_rows, grp, var, gs, "One-way ANOVA",
+                            fp, eta_sq(f, n_lev-1, n_tot-n_lev), "Eta-squared", nt)
                     if fp < 0.05:
                         tukey = pairwise_tukeyhsd(sub[var], sub[grp], alpha=0.05)
-                        td = pd.DataFrame(tukey.summary().data[1:], columns=tukey.summary().data[0])
+                        td    = pd.DataFrame(tukey.summary().data[1:], columns=tukey.summary().data[0])
                         for _, row in td.iterrows():
-                            posthoc_rows.append({"Grouping": grp, "Variable": var,
+                            posthoc_rows.append({
+                                "Grouping": grp, "Variable": var,
                                 "Comparison": f"{row['group1']} vs {row['group2']}",
-                                "Test": "Tukey HSD", "P_adj": round(float(row["p-adj"]), 4),
+                                "Test": "Tukey HSD",
+                                "P_adj": round(float(row["p-adj"]), 4),
                                 "Significance": star(row["p-adj"]),
                                 "Mean_Diff": round(float(row["meandiff"]), 4),
-                                "Lower_CI": round(float(row["lower"]), 4),
-                                "Upper_CI": round(float(row["upper"]), 4)})
+                                "Lower_CI":  round(float(row["lower"]),   4),
+                                "Upper_CI":  round(float(row["upper"]),   4),
+                            })
                     h, hp = kruskal(*arrs)
-                    add_row(unified_rows, grp, var, gs, "Kruskal-Wallis", hp, eps_sq(h, n_tot), "Epsilon-squared", nt)
+                    add_row(unified_rows, grp, var, gs, "Kruskal-Wallis",
+                            hp, eps_sq(h, n_tot), "Epsilon-squared", nt)
                     if hp < 0.05:
-                        dunn = dunn_bonf({g: sub[sub[grp]==g][var].dropna().values for g in levels})
+                        dunn = dunn_bonf({g: sub[sub[grp] == g][var].dropna().values for g in levels})
                         if not dunn.empty:
                             for _, row in dunn.iterrows():
-                                posthoc_rows.append({"Grouping": grp, "Variable": var,
+                                posthoc_rows.append({
+                                    "Grouping": grp, "Variable": var,
                                     "Comparison": f"{row['Group1']} vs {row['Group2']}",
                                     "Test": "Dunn (Bonferroni)",
                                     "P_adj": round(float(row["P_Bonferroni"]), 4),
                                     "Significance": star(row["P_Bonferroni"]),
                                     "Effect_Size": round(float(row["Effect_Size"]), 4),
-                                    "Effect_Type": "Rank-biserial r"})
+                                    "Effect_Type": "Rank-biserial r",
+                                })
 
     progress.progress(38, "Advanced tests…")
 
+    # ── Chi-square ────────────────────────────────────────────────────────
     chi2_results = []
     if do_chi2 and chi2_vars and len(chi2_vars) == 2:
-        c1v, c2v = chi2_vars
-        ct = pd.crosstab(df[c1v], df[c2v])
+        cv1, cv2 = chi2_vars
+        ct       = pd.crosstab(df[cv1], df[cv2])
         chi2s, pc, dof, exp = chi2_contingency(ct)
-        chi2_results.append({"Var1": c1v, "Var2": c2v,
-            "Chi-sq": round(chi2s, 4), "df": dof, "P-value": round(pc, 4),
-            "Significance": star(pc), "N": int(ct.values.sum()),
-            "Note": "Fisher's exact recommended (expected cell <5)" if (exp<5).any() else ""})
+        chi2_results.append({
+            "Var1": cv1, "Var2": cv2,
+            "Chi-sq": round(chi2s, 4), "df": dof,
+            "P-value": round(pc, 4), "Significance": star(pc),
+            "N": int(ct.values.sum()),
+            "Note": "Fisher's exact recommended (expected cell <5)" if (exp < 5).any() else "",
+        })
 
+    # ── Friedman ──────────────────────────────────────────────────────────
     friedman_results = []
     if do_friedman and wide_mode and len(group_cols_wide) >= 3:
         pf = df[group_cols_wide].dropna()
         if len(pf) >= 3:
             F, fp = friedmanchisquare(*[pf[c].values for c in group_cols_wide])
-            friedman_results.append({"Columns": " | ".join(group_cols_wide),
-                "Friedman stat": round(F, 4), "P-value": round(fp, 4),
-                "Significance": star(fp), "N": len(pf)})
+            friedman_results.append({
+                "Columns": " | ".join(group_cols_wide),
+                "Friedman stat": round(F, 4),
+                "P-value": round(fp, 4),
+                "Significance": star(fp),
+                "N": len(pf),
+            })
 
+    # ── Two-way ANOVA ─────────────────────────────────────────────────────
     twoway_results = []
     if do_twoway and not wide_mode and twoway_vars and twoway_cat1 and twoway_cat2:
         for var in twoway_vars:
@@ -1041,28 +1149,40 @@ if run_btn:
             sub.columns = ["Y", "F1", "F2"]
             try:
                 model = smf.ols("Y ~ C(F1) + C(F2) + C(F1):C(F2)", data=sub).fit()
-                at = sm.stats.anova_lm(model, typ=2)
+                at    = sm.stats.anova_lm(model, typ=2)
                 for idx, row in at.iterrows():
-                    twoway_results.append({"Outcome": var, "Effect": str(idx),
-                        "SS": round(float(row["sum_sq"]), 4), "df": round(float(row["df"]), 2),
-                        "F": round(float(row["F"]), 4) if "F" in row else np.nan,
-                        "P-value": round(float(row["PR(>F)"]), 4) if "PR(>F)" in row else np.nan,
-                        "Significance": star(row["PR(>F)"]) if "PR(>F)" in row else ""})
+                    twoway_results.append({
+                        "Outcome": var, "Effect": str(idx),
+                        "SS": round(float(row["sum_sq"]), 4),
+                        "df": round(float(row["df"]), 2),
+                        "F":  round(float(row["F"]),      4) if "F"      in row else np.nan,
+                        "P-value":      round(float(row["PR(>F)"]), 4) if "PR(>F)" in row else np.nan,
+                        "Significance": star(row["PR(>F)"])             if "PR(>F)" in row else "",
+                    })
             except Exception as ex:
-                twoway_results.append({"Outcome": var, "Effect": f"Error: {ex}",
-                    "SS": np.nan, "df": np.nan, "F": np.nan, "P-value": np.nan, "Significance": ""})
+                twoway_results.append({
+                    "Outcome": var, "Effect": f"Error: {ex}",
+                    "SS": np.nan, "df": np.nan, "F": np.nan,
+                    "P-value": np.nan, "Significance": "",
+                })
 
+    # ── MLR ───────────────────────────────────────────────────────────────
     mlr_results = []; mlr_fig_bytes = None; mlr_txt = ""
     if do_mlr and mlr_outcome and mlr_predictors:
         sub_mlr = df[[mlr_outcome] + mlr_predictors].dropna()
         if len(sub_mlr) > len(mlr_predictors) + 1:
-            X = sm.add_constant(sub_mlr[mlr_predictors]); y = sub_mlr[mlr_outcome]
-            mod = sm.OLS(y, X).fit(); mlr_txt = mod.summary().as_text()
-            for nm, coef, se, t, p in zip(mod.params.index, mod.params.values,
-                                           mod.bse.values, mod.tvalues.values, mod.pvalues.values):
-                mlr_results.append({"Predictor": nm, "Coefficient": round(coef, 4),
+            X   = sm.add_constant(sub_mlr[mlr_predictors])
+            y   = sub_mlr[mlr_outcome]
+            mod = sm.OLS(y, X).fit()
+            mlr_txt = mod.summary().as_text()
+            for nm, coef, se, t, p in zip(
+                    mod.params.index, mod.params.values,
+                    mod.bse.values, mod.tvalues.values, mod.pvalues.values):
+                mlr_results.append({
+                    "Predictor": nm, "Coefficient": round(coef, 4),
                     "Std Error": round(se, 4), "t-stat": round(t, 4),
-                    "P-value": round(p, 4), "Significance": star(p)})
+                    "P-value": round(p, 4), "Significance": star(p),
+                })
             fig_r, axes_r = plt.subplots(1, 2, figsize=(12, 5))
             axes_r[0].scatter(mod.fittedvalues, mod.resid, alpha=0.6, s=40, color="steelblue")
             axes_r[0].axhline(0, color="red", ls="--", lw=1.5)
@@ -1080,16 +1200,20 @@ if run_btn:
     desc_rows = []
     for var in vars_desc:
         s = df[var].dropna()
-        if len(s) == 0: continue
+        if len(s) == 0:
+            continue
         _, sw_p = shapiro(s) if len(s) >= 3 else (np.nan, np.nan)
-        desc_rows.append({"Variable": var, "N": len(s), "Missing": df[var].isna().sum(),
+        desc_rows.append({
+            "Variable": var, "N": len(s), "Missing": df[var].isna().sum(),
             "Mean": round(s.mean(), 3), "SD": round(s.std(), 3), "SE": round(s.sem(), 3),
-            "Min": round(s.min(), 3), "Q1": round(s.quantile(0.25), 3),
+            "Min": round(s.min(), 3),   "Q1": round(s.quantile(0.25), 3),
             "Median": round(s.median(), 3), "Q3": round(s.quantile(0.75), 3),
-            "Max": round(s.max(), 3), "Skewness": round(float(s.skew()), 3),
+            "Max": round(s.max(), 3),
+            "Skewness": round(float(s.skew()), 3),
             "Kurtosis": round(float(s.kurtosis()), 3),
             "Shapiro-Wilk p": round(sw_p, 4) if sw_p else np.nan,
-            "Normal?": "Yes" if sw_p and sw_p >= 0.05 else "No"})
+            "Normal?": "Yes" if sw_p and sw_p >= 0.05 else "No",
+        })
     desc_df = pd.DataFrame(desc_rows)
 
     desc_fig_bytes = None
@@ -1100,7 +1224,8 @@ if run_btn:
         for i, var in enumerate(vars_desc):
             sns.histplot(df[var].dropna(), kde=True, ax=axs_d[i], color="steelblue", alpha=0.7)
             axs_d[i].set_title(var, fontsize=9, fontweight="bold"); axs_d[i].set_xlabel("")
-        for i in range(n_d, len(axs_d)): axs_d[i].set_visible(False)
+        for i in range(n_d, len(axs_d)):
+            axs_d[i].set_visible(False)
         fig_d.suptitle("Distributions", fontsize=12, fontweight="bold")
         fig_d.tight_layout()
         desc_fig_bytes = save_fig(fig_d).read(); plt.close(fig_d)
@@ -1108,10 +1233,10 @@ if run_btn:
     corr_vars = group_cols_wide if wide_mode else selected_numeric
     pearson_corr = spearman_corr = pd.DataFrame(); corr_fig_bytes = None
     if do_corr and len(corr_vars) > 1:
-        cd = df[corr_vars].dropna()
+        cd           = df[corr_vars].dropna()
         pearson_corr = cd.corr(); spearman_corr = cd.corr(method="spearman")
-        fs = max(6, len(corr_vars)*0.9)
-        fc, ac = plt.subplots(figsize=(fs, fs*0.8))
+        fs           = max(6, len(corr_vars) * 0.9)
+        fc, ac       = plt.subplots(figsize=(fs, fs * 0.8))
         sns.heatmap(pearson_corr, annot=True, cmap="coolwarm", center=0,
                     fmt=".2f", linewidths=0.5, ax=ac, square=True, cbar_kws={"shrink": 0.8})
         ac.set_title("Pearson Correlation Heatmap", fontsize=13, fontweight="bold")
@@ -1119,15 +1244,18 @@ if run_btn:
         corr_fig_bytes = save_fig(fc).read(); plt.close(fc)
 
     progress.progress(76, "Generating plots…")
+
+    # ── Boxplots ──────────────────────────────────────────────────────────
     bp_figs = []
     if wide_mode and group_cols_wide:
         fig, ax = plt.subplots(figsize=(max(8, len(group_cols_wide)*1.8), 6))
         melt = df[group_cols_wide].melt(var_name="Column", value_name="Value").dropna()
-        sns.boxplot(data=melt, x="Column", y="Value", ax=ax, palette="Set2")
+        sns.boxplot(data=melt,  x="Column", y="Value", ax=ax, palette="Set2")
         sns.stripplot(data=melt, x="Column", y="Value", ax=ax, color="black", alpha=0.35, size=3)
         ax.set_title("Column Comparison — Boxplot", fontweight="bold", fontsize=12)
         ax.tick_params(axis="x", rotation=30); fig.tight_layout()
         bp_figs.append(("Wide-format column comparison", save_fig(fig).read())); plt.close(fig)
+
     elif selected_cat and use_facet:
         for grp in selected_cat:
             pval_d = {}
@@ -1135,124 +1263,267 @@ if run_btn:
                 sub = df.dropna(subset=[var, grp]); lev = sub[grp].dropna().unique()
                 if len(lev) < 2: continue
                 arrs = [sub[sub[grp]==g][var].dropna().values for g in lev]
-                nrm = all_normal([sub[sub[grp]==g][var].dropna() for g in lev])
+                nrm  = all_normal([sub[sub[grp]==g][var].dropna() for g in lev])
                 if len(lev) == 2:
-                    g1, g2 = arrs[0], arrs[1]
-                    pval_d[var] = ttest_ind(g1, g2)[1] if nrm else mannwhitneyu(g1, g2, alternative="two-sided")[1]
+                    bpg1, bpg2 = arrs[0], arrs[1]
+                    pval_d[var] = ttest_ind(bpg1, bpg2)[1] if nrm else mannwhitneyu(bpg1, bpg2, alternative="two-sided")[1]
                 else:
                     pval_d[var] = f_oneway(*arrs)[1] if nrm else kruskal(*arrs)[1]
             n_v = len(selected_numeric); nr, nc = smart_grid(n_v); n_last = n_v-(nr-1)*nc
-            fig = plt.figure(figsize=(5*nc, 4.2*nr))
-            gs2 = gridspec.GridSpec(nr, nc, figure=fig, hspace=0.5, wspace=0.35)
+            fig  = plt.figure(figsize=(5*nc, 4.2*nr))
+            gs2  = gridspec.GridSpec(nr, nc, figure=fig, hspace=0.5, wspace=0.35)
             axes = []
             for r in range(nr):
                 panels = nc if r < nr-1 else n_last
                 offset = int((nc-panels)/2) if panels < nc else 0
                 for c in range(panels):
-                    try: ax = fig.add_subplot(gs2[r, offset+c])
+                    try:    ax = fig.add_subplot(gs2[r, offset+c])
                     except: ax = fig.add_subplot(gs2[r, c])
                     axes.append(ax)
             for idx, var in enumerate(selected_numeric):
                 ax = axes[idx]
-                sns.boxplot(data=df, x=grp, y=var, ax=ax, palette="Set2")
+                sns.boxplot(data=df,  x=grp, y=var, ax=ax, palette="Set2")
                 sns.stripplot(data=df, x=grp, y=var, ax=ax, color="black", alpha=0.4, size=2)
                 ax.set_title(var, fontweight="bold", fontsize=9); ax.set_xlabel("")
                 ax.tick_params(axis="x", rotation=40, labelsize=8)
                 pv = pval_d.get(var, np.nan)
-                try: pv_f = float(pv)
+                try:    pv_f = float(pv)
                 except: pv_f = np.nan
                 txt = f"p={pv_f:.4f} {star(pv_f)}" if not np.isnan(pv_f) else "p=N/A"
-                ax.text(0.5, 0.97, txt, transform=ax.transAxes, ha="center", va="top", fontsize=8,
-                        bbox=dict(facecolor="white", alpha=0.8, edgecolor="#aaa", boxstyle="round"))
+                ax.text(0.5, 0.97, txt, transform=ax.transAxes, ha="center", va="top",
+                        fontsize=8, bbox=dict(facecolor="white", alpha=0.8,
+                                              edgecolor="#aaa", boxstyle="round"))
             fig.suptitle(f"Boxplots by {grp}", fontsize=13, fontweight="bold", y=1.01)
             bp_figs.append((f"Boxplot — {grp}", save_fig(fig).read())); plt.close(fig)
 
+    # ── Extra Plots ───────────────────────────────────────────────────────
+    progress.progress(84, "Extra plots…")
     extra_figs = []
-    ep = sns.color_palette("husl", max(len(xvars_extra), len(yvars_extra), 4))
-    all_ec = list(set(xvars_extra + yvars_extra + ([group_extra] if group_extra else [])))
-    data_ex = df[[c for c in all_ec if c in df.columns]].dropna() if all_ec else pd.DataFrame()
+    ep = sns.color_palette("husl", max(
+        len(xvars_extra) if xvars_extra else 1,
+        len(yvars_extra) if yvars_extra else 1,
+        6))
 
-    def scatter_base(xv, yv, ax):
-        if group_extra and group_extra in data_ex.columns:
-            for gi, (gv, gd) in enumerate(data_ex.groupby(group_extra)):
-                ax.scatter(gd[xv], gd[yv], alpha=0.7, label=str(gv), s=45, color=ep[gi%len(ep)])
+    def _src_for(*cols):
+        """Return df rows complete for the listed columns (ignores None/missing)."""
+        valid = [c for c in cols if c and c in df.columns]
+        return df[valid].dropna() if valid else pd.DataFrame()
+
+    def scatter_base(xv, yv, ax, src):
+        if group_extra and group_extra in src.columns:
+            for gi, (gv, gd) in enumerate(src.groupby(group_extra)):
+                ax.scatter(gd[xv], gd[yv], alpha=0.7, label=str(gv),
+                           s=45, color=ep[gi % len(ep)])
             ax.legend(title=group_extra, fontsize=8)
         else:
-            ax.scatter(data_ex[xv], data_ex[yv], alpha=0.7, s=45, color="steelblue")
+            ax.scatter(src[xv], src[yv], alpha=0.7, s=45, color="steelblue")
         try:
-            m, b = np.polyfit(data_ex[xv], data_ex[yv], 1)
-            xl = np.linspace(data_ex[xv].min(), data_ex[xv].max(), 100)
+            _x, _y = src[xv].values, src[yv].values
+            m, b   = np.polyfit(_x, _y, 1)
+            xl     = np.linspace(_x.min(), _x.max(), 100)
             ax.plot(xl, m*xl+b, "r--", lw=1.5)
-            r, p = pearsonr(data_ex[xv], data_ex[yv])
+            r, p   = pearsonr(_x, _y)
             ax.text(0.05, 0.95, f"r={r:.3f}, p={p:.4f} {star(p)}",
-                    transform=ax.transAxes, va="top", bbox=dict(facecolor="white", alpha=0.8))
-        except: pass
-        ax.set_xlabel(xv, fontsize=11); ax.set_ylabel(yv, fontsize=11)
+                    transform=ax.transAxes, va="top",
+                    bbox=dict(facecolor="white", alpha=0.8))
+        except Exception:
+            pass
+        ax.set_xlabel(xv, fontsize=11)
+        ax.set_ylabel(yv, fontsize=11)
 
     for pt in selected_plots:
-        if pt == "Scatter Plot" and xvars_extra and yvars_extra:
+
+        # ── Scatter ───────────────────────────────────────────────────────
+        if pt == "Scatter Plot":
+            if not xvars_extra or not yvars_extra:
+                continue
             for xv in xvars_extra:
                 for yv in yvars_extra:
-                    if xv == yv: continue
-                    fig, ax = plt.subplots(figsize=(7, 5)); scatter_base(xv, yv, ax)
-                    ax.set_title(f"Scatter: {yv} vs {xv}", fontweight="bold")
-                    fig.tight_layout(); extra_figs.append((f"Scatter {yv} vs {xv}", save_fig(fig).read())); plt.close(fig)
-        elif pt == "Regression Plot" and xvars_extra and yvars_extra:
-            for xv in xvars_extra:
-                for yv in yvars_extra:
-                    if xv == yv: continue
+                    if xv == yv:
+                        continue
+                    src = _src_for(xv, yv, group_extra)
+                    if src.empty:
+                        continue
                     fig, ax = plt.subplots(figsize=(7, 5))
-                    if group_extra and group_extra in data_ex.columns:
-                        for gi, (gv, gd) in enumerate(data_ex.groupby(group_extra)):
+                    scatter_base(xv, yv, ax, src)
+                    ax.set_title(f"Scatter: {yv} vs {xv}", fontweight="bold")
+                    fig.tight_layout()
+                    extra_figs.append((f"Scatter {yv} vs {xv}", save_fig(fig).read()))
+                    plt.close(fig)
+
+        # ── Regression ────────────────────────────────────────────────────
+        elif pt == "Regression Plot":
+            if not xvars_extra or not yvars_extra:
+                continue
+            for xv in xvars_extra:
+                for yv in yvars_extra:
+                    if xv == yv:
+                        continue
+                    src = _src_for(xv, yv, group_extra)
+                    if src.empty:
+                        continue
+                    fig, ax = plt.subplots(figsize=(7, 5))
+                    if group_extra and group_extra in src.columns:
+                        for gi, (gv, gd) in enumerate(src.groupby(group_extra)):
                             sns.regplot(data=gd, x=xv, y=yv, ax=ax, label=str(gv),
-                                        color=ep[gi%len(ep)], scatter_kws={"alpha": 0.6, "s": 40}, line_kws={"lw": 2})
+                                        color=ep[gi % len(ep)],
+                                        scatter_kws={"alpha": 0.6, "s": 40},
+                                        line_kws={"lw": 2})
                         ax.legend(title=group_extra, fontsize=8)
                     else:
-                        sns.regplot(data=data_ex, x=xv, y=yv, ax=ax,
-                                    scatter_kws={"alpha": 0.6, "s": 40, "color": "steelblue"}, line_kws={"lw": 2, "color": "red"})
+                        sns.regplot(data=src, x=xv, y=yv, ax=ax,
+                                    scatter_kws={"alpha": 0.6, "s": 40, "color": "steelblue"},
+                                    line_kws={"lw": 2, "color": "red"})
                     try:
-                        r, p = pearsonr(data_ex[xv], data_ex[yv])
+                        r, p = pearsonr(src[xv].values, src[yv].values)
                         ax.text(0.05, 0.95, f"r={r:.3f}, p={p:.4f} {star(p)}",
-                                transform=ax.transAxes, va="top", bbox=dict(facecolor="white", alpha=0.8))
-                    except: pass
+                                transform=ax.transAxes, va="top",
+                                bbox=dict(facecolor="white", alpha=0.8))
+                    except Exception:
+                        pass
                     ax.set_xlabel(xv, fontsize=11); ax.set_ylabel(yv, fontsize=11)
                     ax.set_title(f"Regression: {yv} ~ {xv}", fontweight="bold")
-                    fig.tight_layout(); extra_figs.append((f"Regression {yv}~{xv}", save_fig(fig).read())); plt.close(fig)
+                    fig.tight_layout()
+                    extra_figs.append((f"Regression {yv}~{xv}", save_fig(fig).read()))
+                    plt.close(fig)
+
+        # ── Bland-Altman ──────────────────────────────────────────────────
         elif pt == "Bland-Altman":
-            if len(yvars_extra) == 2:
-                y1, y2 = yvars_extra; pd2 = data_ex[[y1, y2]].dropna()
-                diff = pd2[y1]-pd2[y2]; mean_ba = (pd2[y1]+pd2[y2])/2
-                md, sd_ba = diff.mean(), diff.std(ddof=1)
-                fig, ax = plt.subplots(figsize=(9, 6))
-                if group_extra and group_extra in data_ex.columns:
-                    for gi, (gv, gd) in enumerate(data_ex.groupby(group_extra)):
-                        ax.scatter((gd[y1]+gd[y2])/2, gd[y1]-gd[y2], alpha=0.7, label=str(gv), s=45, color=ep[gi%len(ep)])
-                    ax.legend(title=group_extra)
-                else:
-                    ax.scatter(mean_ba, diff, alpha=0.7, s=45, color="steelblue")
-                ax.axhline(md, color="red", lw=2, label=f"Mean diff={md:.2f}")
-                ax.axhline(md+1.96*sd_ba, color="gray", ls="--", lw=1.5, label=f"+1.96SD={md+1.96*sd_ba:.2f}")
-                ax.axhline(md-1.96*sd_ba, color="gray", ls="--", lw=1.5, label=f"-1.96SD={md-1.96*sd_ba:.2f}")
-                ax.set_xlabel(f"Mean of {y1} & {y2}", fontsize=11); ax.set_ylabel(f"Difference ({y1}−{y2})", fontsize=11)
-                ax.set_title(f"Bland-Altman: {y1} vs {y2}", fontweight="bold"); ax.legend(fontsize=8)
-                fig.tight_layout(); extra_figs.append((f"Bland-Altman {y1} vs {y2}", save_fig(fig).read())); plt.close(fig)
-        elif pt == "Violin Plot" and yvars_extra:
+            if len(yvars_extra) != 2:
+                continue   # sidebar already shows the hint
+            y1, y2 = yvars_extra
+            src    = _src_for(y1, y2, group_extra)
+            if src.empty:
+                continue
+            diff    = src[y1] - src[y2]
+            mean_ba = (src[y1] + src[y2]) / 2
+            md, sd_ba = diff.mean(), diff.std(ddof=1)
+            fig, ax = plt.subplots(figsize=(9, 6))
+            if group_extra and group_extra in src.columns:
+                for gi, (gv, gd) in enumerate(src.groupby(group_extra)):
+                    ax.scatter((gd[y1]+gd[y2])/2, gd[y1]-gd[y2],
+                               alpha=0.7, label=str(gv), s=45, color=ep[gi % len(ep)])
+                ax.legend(title=group_extra)
+            else:
+                ax.scatter(mean_ba, diff, alpha=0.7, s=45, color="steelblue")
+            ax.axhline(md,                 color="red",  lw=2,    label=f"Mean diff={md:.2f}")
+            ax.axhline(md+1.96*sd_ba,      color="gray", ls="--", lw=1.5,
+                       label=f"+1.96SD={md+1.96*sd_ba:.2f}")
+            ax.axhline(md-1.96*sd_ba,      color="gray", ls="--", lw=1.5,
+                       label=f"-1.96SD={md-1.96*sd_ba:.2f}")
+            ax.set_xlabel(f"Mean of {y1} & {y2}", fontsize=11)
+            ax.set_ylabel(f"Difference ({y1}−{y2})", fontsize=11)
+            ax.set_title(f"Bland-Altman: {y1} vs {y2}", fontweight="bold")
+            ax.legend(fontsize=8); fig.tight_layout()
+            extra_figs.append((f"Bland-Altman {y1} vs {y2}", save_fig(fig).read()))
+            plt.close(fig)
+
+        # ── Mean Line Graph ───────────────────────────────────────────────
+        # xcat_extra  = categorical column → levels on X axis (e.g. Pre, Post)
+        # yvars_extra = numeric columns    → one line each
+        # group_extra = optional           → separate subplot per group level
+        elif pt == "Mean Line Graph":
+            if not xcat_extra or not yvars_extra:
+                continue
+            src = _src_for(*([xcat_extra] + yvars_extra + ([group_extra] if group_extra else [])))
+            if src.empty:
+                continue
+
+            # Sort X levels: numeric order if possible, else alphabetic
+            x_levels = src[xcat_extra].dropna().unique().tolist()
+            try:
+                x_levels = sorted(x_levels, key=lambda v: float(v))
+            except (ValueError, TypeError):
+                x_levels = sorted(x_levels)
+
+            if group_extra and group_extra in src.columns:
+                g_levels = sorted(src[group_extra].dropna().unique().tolist())
+                n_grp    = len(g_levels)
+                fig, axes_mlg = plt.subplots(
+                    1, n_grp, figsize=(max(5, 5*n_grp), 5), sharey=True)
+                if n_grp == 1:
+                    axes_mlg = [axes_mlg]
+                for gi, grp_val in enumerate(g_levels):
+                    ax  = axes_mlg[gi]
+                    sub = src[src[group_extra] == grp_val]
+                    for yi, yv in enumerate(yvars_extra):
+                        means = [sub[sub[xcat_extra] == xl][yv].mean() for xl in x_levels]
+                        sems  = [sub[sub[xcat_extra] == xl][yv].sem()  for xl in x_levels]
+                        ax.plot(x_levels, means, "o-", lw=2.5, ms=8,
+                                color=ep[yi % len(ep)], label=yv, zorder=3)
+                        ax.errorbar(x_levels, means, yerr=sems, fmt="none",
+                                    ecolor=ep[yi % len(ep)], capsize=5, lw=1.5)
+                    ax.set_title(f"{group_extra} = {grp_val}", fontweight="bold", fontsize=10)
+                    ax.set_xlabel(xcat_extra, fontsize=11)
+                    if gi == 0:
+                        ax.set_ylabel("Mean ± SE", fontsize=11)
+                    ax.tick_params(axis="x", rotation=30)
+                    ax.grid(axis="y", alpha=0.3)
+                handles, labels = axes_mlg[0].get_legend_handles_labels()
+                fig.legend(handles, labels, loc="upper right", fontsize=9,
+                           title="Variable", bbox_to_anchor=(1.0, 0.95))
+                fig.suptitle(f"Mean Line Graph — by {group_extra}",
+                             fontsize=13, fontweight="bold")
+            else:
+                fig, ax = plt.subplots(figsize=(max(7, len(x_levels)*1.8), 5))
+                for yi, yv in enumerate(yvars_extra):
+                    means = [src[src[xcat_extra] == xl][yv].mean() for xl in x_levels]
+                    sems  = [src[src[xcat_extra] == xl][yv].sem()  for xl in x_levels]
+                    ax.plot(x_levels, means, "o-", lw=2.5, ms=8,
+                            color=ep[yi % len(ep)], label=yv, zorder=3)
+                    ax.errorbar(x_levels, means, yerr=sems, fmt="none",
+                                ecolor=ep[yi % len(ep)], capsize=5, lw=1.5)
+                ax.set_xlabel(xcat_extra, fontsize=12)
+                ax.set_ylabel("Mean ± SE", fontsize=12)
+                ax.set_title("Mean Line Graph", fontsize=13, fontweight="bold")
+                ax.legend(title="Variable", fontsize=9, loc="best")
+                ax.tick_params(axis="x", rotation=30)
+                ax.grid(axis="y", alpha=0.3)
+            fig.tight_layout()
+            extra_figs.append((f"Mean Line Graph ({xcat_extra})", save_fig(fig).read()))
+            plt.close(fig)
+
+        # ── Violin ────────────────────────────────────────────────────────
+        elif pt == "Violin Plot":
+            if not yvars_extra:
+                continue
             if group_extra:
                 for yv in yvars_extra:
-                    pd3 = df[[yv, group_extra]].dropna()
-                    fig, ax = plt.subplots(figsize=(9, 5))
-                    sns.violinplot(data=pd3, x=group_extra, y=yv, ax=ax, palette="Set2", inner="box")
-                    sns.stripplot(data=pd3, x=group_extra, y=yv, ax=ax, color="black", alpha=0.3, size=3)
+                    src = _src_for(yv, group_extra)
+                    if src.empty:
+                        continue
+                    fig, ax = plt.subplots(figsize=(max(7, src[group_extra].nunique()*1.5), 5))
+                    sns.violinplot(data=src, x=group_extra, y=yv, ax=ax, palette="Set2", inner="box")
+                    sns.stripplot(data=src, x=group_extra, y=yv, ax=ax, color="black", alpha=0.3, size=3)
                     ax.set_title(f"Violin: {yv} by {group_extra}", fontweight="bold")
                     ax.tick_params(axis="x", rotation=40); fig.tight_layout()
-                    extra_figs.append((f"Violin {yv}", save_fig(fig).read())); plt.close(fig)
+                    extra_figs.append((f"Violin {yv} by {group_extra}", save_fig(fig).read()))
+                    plt.close(fig)
             else:
-                fig, ax = plt.subplots(figsize=(max(6, len(yvars_extra)*2), 5))
-                pd3 = df[yvars_extra].melt(var_name="Variable", value_name="Value").dropna()
-                sns.violinplot(data=pd3, x="Variable", y="Value", ax=ax, palette="Set2", inner="box")
-                ax.set_title("Violin Plot", fontweight="bold"); fig.tight_layout()
-                extra_figs.append(("Violin", save_fig(fig).read())); plt.close(fig)
-        elif pt == "Histogram" and yvars_extra:
+                if len(yvars_extra) == 1:
+                    src = df[[yvars_extra[0]]].dropna()
+                    fig, ax = plt.subplots(figsize=(5, 5))
+                    sns.violinplot(data=src, y=yvars_extra[0], ax=ax, palette="Set2", inner="box")
+                    ax.set_title(f"Violin: {yvars_extra[0]}", fontweight="bold")
+                    fig.tight_layout()
+                    extra_figs.append((f"Violin {yvars_extra[0]}", save_fig(fig).read()))
+                    plt.close(fig)
+                else:
+                    src = df[yvars_extra].dropna()
+                    if not src.empty:
+                        fig, ax = plt.subplots(figsize=(max(6, len(yvars_extra)*2), 5))
+                        pd3 = src.melt(var_name="Variable", value_name="Value")
+                        sns.violinplot(data=pd3, x="Variable", y="Value", ax=ax,
+                                       palette="Set2", inner="box")
+                        ax.set_title("Violin Plot", fontweight="bold")
+                        ax.tick_params(axis="x", rotation=30); fig.tight_layout()
+                        extra_figs.append(("Violin", save_fig(fig).read()))
+                        plt.close(fig)
+
+        # ── Histogram ─────────────────────────────────────────────────────
+        elif pt == "Histogram":
+            if not yvars_extra:
+                continue
             n_h = len(yvars_extra); nr_h, nc_h = smart_grid(n_h)
             fig, axes_h = plt.subplots(nr_h, nc_h, figsize=(5*nc_h, 4*nr_h))
             axs = np.array(axes_h).flatten() if n_h > 1 else [axes_h]
@@ -1260,49 +1531,78 @@ if run_btn:
                 ax = axs[i]
                 if group_extra and group_extra in df.columns:
                     for gi, (gv, gd) in enumerate(df.groupby(group_extra)):
-                        sns.histplot(gd[yv].dropna(), ax=ax, label=str(gv), color=ep[gi%len(ep)], alpha=0.5, kde=True)
+                        sns.histplot(gd[yv].dropna(), ax=ax, label=str(gv),
+                                     color=ep[gi % len(ep)], alpha=0.5, kde=True)
                     ax.legend(fontsize=7)
                 else:
                     sns.histplot(df[yv].dropna(), ax=ax, kde=True, color="steelblue")
                 ax.set_title(yv, fontweight="bold", fontsize=10); ax.set_xlabel("")
-            for i in range(n_h, len(axs)): axs[i].set_visible(False)
+            for i in range(n_h, len(axs)):
+                axs[i].set_visible(False)
             fig.suptitle("Histograms", fontsize=13, fontweight="bold"); fig.tight_layout()
             extra_figs.append(("Histograms", save_fig(fig).read())); plt.close(fig)
-        elif pt == "Bar Chart (Mean±SD)" and yvars_extra:
-            if group_extra:
+
+        # ── Bar Chart (Mean±SD) ───────────────────────────────────────────
+        elif pt == "Bar Chart (Mean±SD)":
+            if not yvars_extra:
+                continue
+            if group_extra and group_extra in df.columns:
                 for yv in yvars_extra:
-                    gd3 = df[[yv, group_extra]].dropna().groupby(group_extra)[yv].agg(["mean", "std"]).reset_index()
-                    fig, ax = plt.subplots(figsize=(9, 5))
-                    ax.bar(gd3[group_extra].astype(str), gd3["mean"], yerr=gd3["std"],
-                           capsize=5, color=ep[:len(gd3)], alpha=0.8, edgecolor="black")
-                    ax.set_xlabel(group_extra, fontsize=11); ax.set_ylabel(f"Mean ± SD ({yv})", fontsize=11)
+                    src = _src_for(yv, group_extra)
+                    if src.empty:
+                        continue
+                    gd3 = (src.groupby(group_extra)[yv]
+                             .agg(["mean", "std"])
+                             .reset_index())
+                    fig, ax = plt.subplots(figsize=(max(7, len(gd3)*1.4), 5))
+                    ax.bar(gd3[group_extra].astype(str), gd3["mean"],
+                           yerr=gd3["std"], capsize=5,
+                           color=ep[:len(gd3)], alpha=0.8, edgecolor="black")
+                    ax.set_xlabel(group_extra, fontsize=11)
+                    ax.set_ylabel(f"Mean ± SD ({yv})", fontsize=11)
                     ax.set_title(f"Bar Chart: {yv} by {group_extra}", fontweight="bold")
                     ax.tick_params(axis="x", rotation=40); fig.tight_layout()
-                    extra_figs.append((f"Bar {yv}", save_fig(fig).read())); plt.close(fig)
+                    extra_figs.append((f"Bar {yv} by {group_extra}", save_fig(fig).read()))
+                    plt.close(fig)
             else:
                 means = [df[yv].dropna().mean() for yv in yvars_extra]
                 sds   = [df[yv].dropna().std()  for yv in yvars_extra]
                 fig, ax = plt.subplots(figsize=(max(6, len(yvars_extra)*1.8), 5))
                 ax.bar(yvars_extra, means, yerr=sds, capsize=5,
                        color=ep[:len(yvars_extra)], alpha=0.8, edgecolor="black")
-                ax.set_ylabel("Mean ± SD", fontsize=11); ax.set_title("Bar Chart: Column Means", fontweight="bold")
+                ax.set_ylabel("Mean ± SD", fontsize=11)
+                ax.set_title("Bar Chart: Column Means", fontweight="bold")
                 ax.tick_params(axis="x", rotation=30); fig.tight_layout()
                 extra_figs.append(("Bar Means", save_fig(fig).read())); plt.close(fig)
+
+        # ── Paired Lines ──────────────────────────────────────────────────
         elif pt == "Paired Lines Plot":
-            if len(yvars_extra) == 2:
-                y1, y2 = yvars_extra; pd4 = df[[y1, y2]].dropna()
-                fig, ax = plt.subplots(figsize=(7, 5))
-                for _, row in pd4.iterrows():
-                    ax.plot([y1, y2], [row[y1], row[y2]], "o-", color="steelblue", alpha=0.35, lw=1, ms=3)
-                ax.plot([y1, y2], [pd4[y1].mean(), pd4[y2].mean()], "o-",
-                        color="red", lw=3, ms=8, label="Mean", zorder=5)
-                ax.set_ylabel("Value", fontsize=11); ax.set_title(f"Paired Lines: {y1} vs {y2}", fontweight="bold")
-                ax.legend(); fig.tight_layout()
-                extra_figs.append((f"Paired Lines {y1} vs {y2}", save_fig(fig).read())); plt.close(fig)
+            if len(yvars_extra) != 2:
+                continue
+            y1, y2 = yvars_extra
+            src     = df[[y1, y2]].dropna()
+            if src.empty:
+                continue
+            fig, ax = plt.subplots(figsize=(7, 5))
+            for _, row in src.iterrows():
+                ax.plot([y1, y2], [row[y1], row[y2]], "o-",
+                        color="steelblue", alpha=0.35, lw=1, ms=3)
+            ax.plot([y1, y2], [src[y1].mean(), src[y2].mean()], "o-",
+                    color="red", lw=3, ms=8, label="Mean", zorder=5)
+            try:
+                _, tp = ttest_rel(src[y1], src[y2])
+                title_txt = f"Paired Lines: {y1} vs {y2}   (p={tp:.4f} {star(tp)})"
+            except Exception:
+                title_txt = f"Paired Lines: {y1} vs {y2}"
+            ax.set_title(title_txt, fontweight="bold")
+            ax.set_ylabel("Value", fontsize=11)
+            ax.legend(); fig.tight_layout()
+            extra_figs.append((f"Paired Lines {y1} vs {y2}", save_fig(fig).read()))
+            plt.close(fig)
 
     progress.progress(92, "Saving results…")
 
-    # Cache all results
+    # ── Cache all results ──────────────────────────────────────────────────
     st.session_state.update({
         "res_unified_df":       pd.DataFrame(unified_rows),
         "res_posthoc_df":       pd.DataFrame(posthoc_rows),
@@ -1336,10 +1636,17 @@ if run_btn:
         "res_group_cols_wide":  group_cols_wide,
         "res_df_clean":         df,
         "analysis_done":        True,
+        # extra plots
+        "res_xcat_extra":       xcat_extra,
+        "res_xvars_extra":      xvars_extra,
+        "res_yvars_extra":      yvars_extra,
+        "res_group_extra":      group_extra,
     })
     progress.progress(100, "✅ Done!")
 
+# ─────────────────────────────────────────────────────────
 # Load cached results
+# ─────────────────────────────────────────────────────────
 unified_df       = st.session_state.get("res_unified_df",       pd.DataFrame())
 posthoc_df       = st.session_state.get("res_posthoc_df",       pd.DataFrame())
 desc_df          = st.session_state.get("res_desc_df",          pd.DataFrame())
@@ -1370,7 +1677,8 @@ mlr_pred_disp    = st.session_state.get("res_mlr_predictors",   [])
 df_clean         = st.session_state.get("res_df_clean",         df_raw)
 
 for _df in [unified_df, posthoc_df, desc_df, outlier_df]:
-    if _df is None: _df = pd.DataFrame()
+    if _df is None:
+        _df = pd.DataFrame()
 
 # ─────────────────────────────────────────────────────────
 # RENDER RESULTS TABS
@@ -1379,10 +1687,10 @@ with st.expander("🔍 Data Preview (first 20 rows)", expanded=False):
     preview_df = df_clean if df_clean is not None else df_raw
     st.dataframe(preview_df.head(20), use_container_width=True)
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Rows (clean)", len(preview_df))
-    m2.metric("Columns", len(preview_df.columns))
-    m3.metric("Numeric cols", len(st.session_state.get("res_num_cols", [])))
-    m4.metric("Outliers removed", len(outlier_df) if outlier_df is not None else 0)
+    m1.metric("Rows (clean)",    len(preview_df))
+    m2.metric("Columns",         len(preview_df.columns))
+    m3.metric("Numeric cols",    len(st.session_state.get("res_num_cols", [])))
+    m4.metric("Outliers removed",len(outlier_df) if outlier_df is not None else 0)
     if col_subtype:
         st.markdown("**Column type overrides:**")
         for c, t in col_subtype.items():
@@ -1401,9 +1709,9 @@ with tabs[0]:
     if unified_df is not None and not unified_df.empty:
         sig = int((unified_df["Significance"] != "ns").sum())
         c1, c2, c3 = st.columns(3)
-        c1.metric("Tests run", len(unified_df))
-        c2.metric("Significant", sig)
-        c3.metric("Non-significant", len(unified_df)-sig)
+        c1.metric("Tests run",        len(unified_df))
+        c2.metric("Significant",      sig)
+        c3.metric("Non-significant",  len(unified_df)-sig)
         st.dataframe(unified_df, use_container_width=True, height=420)
         st.download_button("📥 Download CSV",
             unified_df.to_csv(index=False).encode(), "summary.csv", "text/csv")
@@ -1429,11 +1737,13 @@ with tabs[2]:
         with c1c:
             st.subheader("Pearson Correlation")
             if pearson_corr is not None and not pearson_corr.empty:
-                st.dataframe(pearson_corr.style.format("{:.3f}").background_gradient(cmap="coolwarm", axis=None))
+                st.dataframe(pearson_corr.style.format("{:.3f}").background_gradient(
+                    cmap="coolwarm", axis=None))
         with c2c:
             st.subheader("Spearman Correlation")
             if spearman_corr is not None and not spearman_corr.empty:
-                st.dataframe(spearman_corr.style.format("{:.3f}").background_gradient(cmap="coolwarm", axis=None))
+                st.dataframe(spearman_corr.style.format("{:.3f}").background_gradient(
+                    cmap="coolwarm", axis=None))
         if corr_fig_bytes:
             st.image(corr_fig_bytes)
             st.download_button("📥 Heatmap PNG", corr_fig_bytes, "heatmap.png", "image/png")
@@ -1445,7 +1755,8 @@ with tabs[3]:
         for name, fig_bytes in bp_figs:
             st.subheader(name); st.image(fig_bytes)
             sn = name.replace(" ", "_").replace("—", "_")
-            st.download_button("📥 Download", fig_bytes, f"bp_{sn}.png", "image/png", key=f"bp_{sn}")
+            st.download_button("📥 Download", fig_bytes, f"bp_{sn}.png", "image/png",
+                               key=f"bp_{sn}")
     else:
         st.info("Select categorical grouping variables or use wide-format mode.")
 
@@ -1463,13 +1774,14 @@ with tabs[5]:
     if chi2_results:
         st.dataframe(pd.DataFrame(chi2_results), use_container_width=True)
         if chi2_vars_disp and len(chi2_vars_disp) == 2 and df_clean is not None:
-            c1v, c2v = chi2_vars_disp
-            if c1v in df_clean.columns and c2v in df_clean.columns:
-                ct = pd.crosstab(df_clean[c1v], df_clean[c2v])
+            cv1, cv2 = chi2_vars_disp
+            if cv1 in df_clean.columns and cv2 in df_clean.columns:
+                ct = pd.crosstab(df_clean[cv1], df_clean[cv2])
                 st.subheader("Contingency Table"); st.dataframe(ct, use_container_width=True)
-                fig_ct, ax_ct = plt.subplots(figsize=(max(6, len(ct.columns)), max(5, len(ct)*0.6)))
+                fig_ct, ax_ct = plt.subplots(
+                    figsize=(max(6, len(ct.columns)), max(5, len(ct)*0.6)))
                 sns.heatmap(ct, annot=True, fmt="d", cmap="Blues", ax=ax_ct, linewidths=0.5)
-                ax_ct.set_title(f"Contingency: {c1v} × {c2v}", fontweight="bold")
+                ax_ct.set_title(f"Contingency: {cv1} × {cv2}", fontweight="bold")
                 fig_ct.tight_layout()
                 ct_bytes = save_fig(fig_ct).read(); plt.close(fig_ct)
                 st.image(ct_bytes)
@@ -1504,10 +1816,12 @@ with tabs[8]:
         if mlr_outcome_disp and mlr_pred_disp and df_clean is not None:
             try:
                 sub_r2 = df_clean[[mlr_outcome_disp] + mlr_pred_disp].dropna()
-                r2v = round(float(sm.OLS(sub_r2[mlr_outcome_disp],
+                r2v    = round(float(sm.OLS(
+                    sub_r2[mlr_outcome_disp],
                     sm.add_constant(sub_r2[mlr_pred_disp])).fit().rsquared), 4)
                 st.metric("R² (Model fit)", r2v)
-            except: pass
+            except Exception:
+                pass
         st.dataframe(pd.DataFrame(mlr_results), use_container_width=True)
         st.download_button("📥 Download CSV",
             pd.DataFrame(mlr_results).to_csv(index=False).encode(), "mlr.csv", "text/csv")
@@ -1515,7 +1829,8 @@ with tabs[8]:
             st.subheader("Diagnostic Plots"); st.image(mlr_fig_bytes)
             st.download_button("📥 Download PNG", mlr_fig_bytes, "mlr_diag.png", "image/png")
         if mlr_txt:
-            with st.expander("Full OLS summary"): st.text(mlr_txt)
+            with st.expander("Full OLS summary"):
+                st.text(mlr_txt)
     elif _do_mlr:
         st.info("Select outcome + predictors in the sidebar.")
     else:
@@ -1524,11 +1839,41 @@ with tabs[8]:
 with tabs[9]:
     if extra_figs:
         for name, fig_bytes in extra_figs:
-            st.subheader(name); st.image(fig_bytes)
-            sn = name.replace(" ", "_").replace("~", "_").replace("—", "_")
-            st.download_button("📥 Download", fig_bytes, f"{sn}.png", "image/png", key=f"ex_{sn}")
+            st.subheader(name)
+            st.image(fig_bytes)
+            sn = (name.replace(" ", "_")
+                      .replace("~",  "_")
+                      .replace("—",  "_")
+                      .replace("/",  "_")
+                      .replace("(",  "")
+                      .replace(")",  ""))
+            st.download_button(
+                "📥 Download PNG", fig_bytes,
+                f"{sn}.png", "image/png",
+                key=f"ex_{sn}")
     else:
-        st.info("Select plot types and X/Y variables in ⑧ Extra Plots.")
+        st.markdown("### ℹ️ How to use Extra Plots")
+        st.markdown("""
+| Plot type | Required selections |
+|-----------|---------------------|
+| **Scatter** | ≥1 numeric X  +  ≥1 numeric Y |
+| **Regression** | ≥1 numeric X  +  ≥1 numeric Y |
+| **Bland-Altman** | Exactly **2** numeric Y variables |
+| **Mean Line Graph** | 1 categorical X (e.g. Timepoint)  +  ≥1 numeric Y |
+| **Violin** | ≥1 numeric Y  *(add grouping for split violins)* |
+| **Histogram** | ≥1 numeric Y |
+| **Bar Chart (Mean±SD)** | ≥1 numeric Y  *(add grouping for grouped bars)* |
+| **Paired Lines** | Exactly **2** numeric Y variables |
+
+---
+**Step-by-step — Mean Line Graph of Pre/Post for three scores:**
+
+1. Select **Mean Line Graph** in *Plot types*
+2. *X variable — categorical* → choose `Timepoint`  (contains **Pre** and **Post**)
+3. *Y variable(s) — numeric* → choose `Score_A`, `Score_B`, `Score_C`
+4. *Grouping* → choose `Group` to get a separate panel per group *(optional)*
+5. Click **🚀 Run Analysis** — one coloured line per score, error bars = ±SE
+""")
 
 with tabs[10]:
     st.markdown("""
